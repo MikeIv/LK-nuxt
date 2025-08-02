@@ -19,3 +19,17 @@
 body {
   font-family: var(--system-font);
 }
+
+:where(.dark, .dark *) {
+  color-scheme: light !important;
+}
+
+html,
+body {
+  color-scheme: light !important;
+  color: var(--a-black);
+}
+
+.dark-mode {
+  display: none !important;
+}

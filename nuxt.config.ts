@@ -2,20 +2,22 @@
 import svgLoader from "vite-svg-loader";
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
-  nitro: {
-    static: true,
-    compressPublicAssets: {
-      gzip: true,
-      brotli: true,
+  runtimeConfig: {
+    public: {
+      apiBase: "https://lk-schelk.holyhands.ru/api/v1",
     },
-    routeRules: {
-      "/**": {
+  },
+  nitro: {
+    devProxy: {
+      "/api": {
+        target: "https://lk-schelk.holyhands.ru/api/v1",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
         headers: {
-          "X-Frame-Options": "DENY",
-          "X-Content-Type-Options": "nosniff",
-          "Referrer-Policy": "strict-origin-when-cross-origin",
-          "Permissions-Policy": "geolocation=(), microphone=()",
+          Accept: "application/json",
+          "Content-Type": "application/json",
         },
+        cookieDomainRewrite: "localhost",
       },
     },
   },
@@ -44,7 +46,13 @@ export default defineNuxtConfig({
     viewTransition: true,
   },
 
-  modules: ["@nuxt/ui", "@nuxt/eslint", "@vueuse/nuxt", "@nuxt/icon"],
+  modules: [
+    "@nuxt/ui",
+    "@nuxt/eslint",
+    "@vueuse/nuxt",
+    "@nuxt/icon",
+    "@pinia/nuxt",
+  ],
 
   components: [
     { path: "~/components/core", prefix: "Core" },
