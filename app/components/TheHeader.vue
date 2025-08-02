@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import logo from "~/assets/new-logo.svg";
+  // import logo from "~/assets/new-logo.svg";
   // import { useLogin } from "~/stores/auth";
   // import { customFetch } from "~/utils/fetchWrapper";
 
@@ -18,22 +18,16 @@
 </script>
 
 <template>
-  <header class="auth-header">
-    <div class="auth-header__row">
-      <img
-        width="90"
-        height="90"
-        class="auth-header__logo"
-        :src="logo"
-        alt="Лого тц щелковского"
-      />
-      <h1 class="auth-header__title">Личный кабинет арендатора</h1>
+  <header :class="$style.header">
+    <div :class="$style.row">
+      <UIcon name="i-logo" :class="$style.logoIcon" />
+      <h1 :class="$style.title">Личный кабинет арендатора</h1>
     </div>
   </header>
 </template>
 
-<style lang="scss">
-  .auth-header {
+<style module lang="scss">
+  .header {
     position: relative;
     display: flex;
     justify-content: center;
@@ -42,26 +36,28 @@
     max-height: rem(150);
     padding: rem(40) rem(80);
     background-color: var(--a-mainBg);
+  }
 
-    &__row {
-      position: relative;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 100%;
-    }
+  .row {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+  }
 
-    &__logo {
-      position: absolute;
-      left: rem(40);
-      top: calc(50% - 45px);
-    }
+  .logoIcon {
+    position: absolute;
+    left: rem(40);
+    top: calc(50% - 45px);
+    width: rem(90);
+    height: rem(90);
+  }
 
-    &__title {
-      font-size: rem(34);
-      font-weight: bold;
-      text-transform: uppercase;
-      color: var(--a-mainText);
-    }
+  .title {
+    font-size: rem(34);
+    font-weight: bold;
+    text-transform: uppercase;
+    color: var(--a-mainText);
   }
 </style>

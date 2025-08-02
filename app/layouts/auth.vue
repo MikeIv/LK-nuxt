@@ -1,22 +1,18 @@
 <script setup lang="ts"></script>
 
 <template>
-  <div>
+  <section :class="$style.auth">
     <TheHeader />
-    <section class="auth">
-      <slot name="heading" />
-      <slot />
-    </section>
-  </div>
+    <slot />
+  </section>
 </template>
 
-<style lang="scss">
+<style module lang="scss">
   .auth {
     display: flex;
     flex-direction: column;
-    justify-content: space-evenly;
+    justify-content: flex-start;
     align-items: center;
-
     width: 100%;
     height: 100vh;
     background-color: var(--a-white);

@@ -1,42 +1,73 @@
-// https://nuxt.com/docs/api/configuration/nuxt-config
 import svgLoader from "vite-svg-loader";
+
+const API_BASE_URL =
+  process.env.NUXT_PUBLIC_API_BASE || "https://lk-schelk.holyhands.ru/api/v1";
+const IS_DEV = process.env.NODE_ENV === "development";
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   runtimeConfig: {
     public: {
-      apiBase: "https://lk-schelk.holyhands.ru/api/v1",
+      apiBase: API_BASE_URL,
+      isDev: IS_DEV,
     },
   },
   nitro: {
     devProxy: {
       "/api": {
-        target: "https://lk-schelk.holyhands.ru/api/v1",
+        target: API_BASE_URL,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        cookieDomainRewrite: "localhost",
+        cookieDomainRewrite: IS_DEV ? "localhost" : false,
       },
     },
+    ...(!IS_DEV && {
+      minify: true,
+      prerender: {
+        crawlLinks: true,
+        failOnError: false,
+      },
+    }),
   },
+
   devtools: {
-    enabled: true,
+    enabled: IS_DEV,
     timeline: {
-      enabled: true,
+      enabled: IS_DEV,
     },
   },
 
   build: {
-    transpile: ["@nuxt/ui", "truncate-html"],
+    transpile: [
+      "@nuxt/ui",
+      "@nuxt/icon",
+      "@nuxt/image",
+      "@nuxt/eslint",
+      "@vueuse/nuxt",
+      "@pinia/nuxt",
+      "truncate-html",
+    ],
+    ...(!IS_DEV && {
+      analyze: {
+        analyzerMode: "static",
+        openAnalyzer: false,
+      },
+    }),
   },
 
   ssr: false,
 
   devServer: {
     https: false,
+    watchOptions: {
+      usePolling: true,
+      interval: 1000,
+    },
   },
+
   features: {
     devLogs: false,
   },
