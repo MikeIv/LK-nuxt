@@ -1,7 +1,9 @@
 <script setup lang="ts"></script>
 
 <template>
-  <div :class="$style.main">Главная</div>
+  <div :class="$style.main">
+    <h2>Главная</h2>
+  </div>
 </template>
 
 <style module lang="scss">
