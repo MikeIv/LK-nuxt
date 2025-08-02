@@ -10,5 +10,6 @@
     flex-direction: column;
     justify-content: flex-start;
     width: 100%;
+    color: red;
   }
 </style>

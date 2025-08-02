@@ -1,0 +1,31 @@
+@use "sass:map";
+
+$z-index: (
+  modal: (
+    overlay: 5100,
+    content: 5200,
+    nav-menu: 1000,
+  ),
+  dropdown: 4000,
+  header: 3000,
+  footer: 2000,
+  booking-label: 11,
+  intro: 10,
+  default: 1,
+  behind: -1,
+);
+
+@function z($keys...) {
+  $value: $z-index;
+
+  @each $key in $keys {
+    $value: map.get($value, $key);
+
+    @if $value == null {
+      @warn "Ключ `#{$key}` не найден в $z-index";
+      @return null;
+    }
+  }
+
+  @return $value;
+}
