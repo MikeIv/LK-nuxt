@@ -1,6 +1,4 @@
 <script setup lang="ts">
-  import ModulesAuthForm from "~/components/modules/AuthForm.vue";
-
   definePageMeta({
     layout: "auth",
   });
@@ -9,7 +7,7 @@
 <template>
   <section :class="$style.signin">
     <h1 :class="$style.title">Вход в личный кабинет</h1>
-    <ModulesAuthForm />
+    <ModuleAuthForm />
   </section>
 </template>
 
@@ -31,3 +29,4 @@
     color: var(--a-accentText);
   }
 </style>
+

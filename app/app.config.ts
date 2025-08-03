@@ -12,3 +12,4 @@ export default defineAppConfig({
     cssLayer: "base", // set the css layer to inject to
   },
 });
+

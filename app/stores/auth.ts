@@ -31,7 +31,7 @@ export const useAuthStore = defineStore("auth", () => {
     cookie.value = newToken;
 
     // Запланировать обновление токена за 1 минуту до истечения срока
-    scheduleTokenRefresh(14 * 60 * 1000); // 14 минут
+    scheduleTokenRefresh(120 * 60 * 1000); // 120 минут
   };
 
   const clearToken = () => {
@@ -126,15 +126,18 @@ export const useAuthStore = defineStore("auth", () => {
     }
   };
 
-  // Вызываем инициализацию
   init();
+
+  const isAuthenticated = computed(() => !!token.value);
 
   return {
     token,
     isLoading,
     error,
+    isAuthenticated,
     logIn,
     logOut,
     refreshToken,
   };
 });
+

@@ -1,4 +1,3 @@
-// stores/user.ts
 interface User {
   id: number;
   tenant_name: string;
@@ -18,14 +17,15 @@ export const useUserStore = defineStore("user", () => {
   const contractId = ref<number | null>(null);
   const isLoading = ref(false);
 
-  const { fetchUser, changeContract } = useUserApi();
+  const { fetchUser, changeContract } = useUser();
 
   const getUser = async () => {
     isLoading.value = true;
     try {
       const response = await fetchUser();
-      user.value = response.payload;
-      contractId.value = response.payload.id;
+      console.log("RESPONSE", response);
+      user.value = response;
+      contractId.value = response.id;
       return response;
     } finally {
       isLoading.value = false;
@@ -53,3 +53,4 @@ export const useUserStore = defineStore("user", () => {
     changeContract: changeUserContract,
   };
 });
+

@@ -16,12 +16,18 @@ export default defineNuxtConfig({
       "/api": {
         target: API_BASE_URL,
         changeOrigin: true,
+        cors: true,
+        secure: false,
         rewrite: (path) => path.replace(/^\/api/, ""),
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        cookieDomainRewrite: IS_DEV ? "localhost" : false,
+
+        cookies: {
+          parse: true,
+          overwrite: true,
+        },
       },
     },
     ...(!IS_DEV && {
@@ -146,6 +152,14 @@ export default defineNuxtConfig({
     },
   },
 
+  googleFonts: {
+    families: {
+      Montserrat: [400, 500, 600, 700],
+      // Можно добавить другие шрифты
+    },
+    display: "swap",
+  },
+
   icon: {
     customCollections: [
       {
@@ -162,6 +176,15 @@ export default defineNuxtConfig({
     },
     "/_nuxt/**": {
       headers: { "Cache-Control": "public, max-age=31536000, immutable" },
+    },
+    "/api/**": {
+      cors: true,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Credentials": "true",
+      },
     },
   },
 

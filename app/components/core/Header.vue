@@ -1,0 +1,159 @@
+<script setup lang="ts">
+  import { useAuthStore } from "~/stores/auth";
+  import { useUserStore } from "~/stores/user";
+  import { useApi } from "~/composables/useApi";
+
+  const userStore = useUserStore();
+  const { data: userData, isLoading, error, fetchData } = useApi<unknown>();
+
+  const authStore = useAuthStore();
+
+  const userInfo = computed(() => {
+    if (!userStore.user) return null;
+    return [
+      userStore.user.tenant_name,
+      userStore.user.brand,
+      userStore.user.contract_number
+        ? `Договор ${userStore.user.contract_number}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+  });
+
+  const showLogoutConfirm = ref(false);
+  const showLogoutBg = ref(false);
+
+  const handleLogoutConfirm = async (proceed: boolean) => {
+    showLogoutConfirm.value = false;
+    showLogoutBg.value = true;
+
+    if (!proceed) return;
+
+    try {
+      isLoading.value = true;
+      error.value = null;
+      await authStore.logOut();
+
+      if (authStore.useApiDataOnly) {
+        authStore.$reset();
+      }
+    } catch (e) {
+      error.value =
+        e instanceof Error ? e : new Error("Ошибка выхода из системы");
+      console.error("Logout error:", e);
+    } finally {
+      isLoading.value = false;
+      showLogoutBg.value = false;
+    }
+  };
+
+  onMounted(async () => {
+    await userStore.getUser();
+
+    // Альтернативно: можно загружать напрямую через useApi
+    // await fetchData('/api/user/me');
+    // if (userData.value) {
+    //   userStore.user = userData.value;
+    // }
+  });
+</script>
+
+<template>
+  <section :class="$style.header">
+    <div :class="$style.topRow">
+      <div :class="$style.callLeft">
+        <h1 :class="$style.callTitle">Личный кабинет арендатора</h1>
+        <p :class="$style.callText">
+          Удобный инструмент для формирования и хранения <br />
+          финансовых отчетов, подачи заявок на их редактирование <br />
+          и отслеживание статусов, а также управление списком ККТ
+        </p>
+      </div>
+
+      <div :class="$style.statusBtns">
+        <ModuleLogoutPopover
+          :isLoading="isLoading"
+          @confirm="handleLogoutConfirm"
+          @show-bg="showLogoutBg"
+        />
+      </div>
+    </div>
+
+    <div v-if="userInfo" :class="$style.bottomRow">
+      {{ userInfo }}
+    </div>
+
+    <div v-if="error" :class="$style.error">
+      {{ error }}
+    </div>
+
+    <div v-if="isLoading" :class="$style.loading">Загрузка данных...</div>
+  </section>
+</template>
+
+<style module lang="scss">
+  .header {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: rem(200);
+  }
+
+  .topRow {
+    display: flex;
+    justify-content: space-between;
+    padding: rem(20) rem(40);
+  }
+
+  .callLeft {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .statusBtns {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .callTitle {
+    margin-bottom: rem(6);
+    font-size: rem(26);
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  .callText {
+    font-size: rem(14);
+    font-weight: bold;
+    line-height: 1.2;
+  }
+
+  .bottomRow {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: rem(60);
+    padding: 0 rem(40);
+    font-size: rem(21);
+    font-weight: bold;
+    color: var(--a-white);
+    background-color: var(--a-bgGray);
+    text-transform: uppercase;
+  }
+
+  .error {
+    padding: rem(10) rem(20);
+    color: var(--a-error);
+    background-color: var(--a-errorBg);
+    font-size: rem(14);
+  }
+
+  .loading {
+    padding: rem(10) rem(20);
+    color: var(--a-info);
+    background-color: var(--a-infoBg);
+    font-size: rem(14);
+  }
+</style>
+

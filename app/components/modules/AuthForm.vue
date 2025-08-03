@@ -1,15 +1,19 @@
 <script setup lang="ts">
   import * as z from "zod";
   import type { FormSubmitEvent } from "@nuxt/ui";
+  import { useAuthStore } from "~/stores/auth";
 
-  type LoginResponse = {
-    success: boolean;
-    message: string;
-    payload: {
-      access_token: string;
-      refresh_token: string;
-    };
-  };
+  const authStore = useAuthStore();
+  const user = useUser();
+
+  // type LoginResponse = {
+  //   success: boolean;
+  //   message: string;
+  //   payload: {
+  //     access_token: string;
+  //     refresh_token: string;
+  //   };
+  // };
 
   type ApiError = {
     response?: {
@@ -43,21 +47,12 @@
     isLoading.value = true;
 
     try {
-      const response = await $fetch<LoginResponse>("/api/auth/login", {
-        method: "POST",
-        body: event.data,
-        credentials: "include",
-      });
-
-      console.log("Response:", response); // Добавим лог для отладки
+      // Используем authStore вместо прямого вызова $fetch
+      const response = await authStore.logIn(event.data);
 
       if (response?.success) {
-        // Сохраняем токен в cookie и localStorage
-        const token = useCookie("token", { maxAge: 60 * 60 * 24 * 30 }); // 30 дней
-        token.value = response.payload.access_token;
-        localStorage.setItem("access_token", response.payload.access_token);
-
-        // Принудительный переход с заменой истории
+        // После успешного логина загружаем данные пользователя
+        await user.fetchUser();
         await navigateTo("/", { replace: true });
       }
     } catch (error: unknown) {
@@ -193,3 +188,4 @@
     }
   }
 </style>
+

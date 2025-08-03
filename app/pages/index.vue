@@ -1,43 +1,17 @@
 <script setup lang="ts">
   import { useUserStore } from "~/stores/user";
-  // import { useReportStore } from "~/stores/report";
-  // import { useCashersStore } from "~/stores/cashers";
+  import { useKkt } from "~/composables/useKkt";
+
+  const userStore = useUserStore();
+  const { kktData, kktLoading, kktError, loadKktData } = useKkt();
 
   definePageMeta({
     middleware: "auth",
   });
 
-  // interface Casher {
-  //   id: number | null;
-  //   name: string;
-  //   registration_number: string;
-  //   serial_number: string;
-  //   fn_number: string;
-  //   registered_at: string | null;
-  //   installed_at: string | null;
-  //   order: number;
-  //   isEditingTitle?: boolean;
-  //   isCustom?: boolean;
-  //   tempId?: string;
-  //   isDirty?: boolean;
-  // }
-
-  // Stores
-  const userStore = useUserStore();
-  // const reportStore = useReportStore();
-  // const cashersStore = useCashersStore();
-
-  // State
-  const kktData = ref(null);
-  // const initialData = ref<Casher[]>([]);
   const saveMessage = ref("");
   const isError = ref(false);
-  // const cashersState = ref("");
-  // const isInitialLoad = ref(true);
-  const kktLoading = ref(false);
-  const kktError = ref<Error | null>(null);
 
-  // Computed
   const userFields = computed(() => [
     { label: "Юридическое лицо", value: userStore.user?.tenant_name },
     { label: "Бренд", value: userStore.user?.brand },
@@ -47,54 +21,20 @@
     { label: "Дата заключения договора", value: userStore.user?.contract_date },
   ]);
 
-  // Methods
-  // const showMessage = (message: string, error = false) => {
-  //   saveMessage.value = message;
-  //   isError.value = error;
-  //   setTimeout(() => {
-  //     saveMessage.value = "";
-  //   }, 3000);
-  // };
-
-  // const fetchReport = async (contractId: string) => {
-  //   try {
-  //     return await api.get(`/kkt-data?contractId=${contractId}`);
-  //   } catch (error) {
-  //     console.error("Ошибка при загрузке данных ККТ:", error);
-  //     throw error;
-  //   }
-  // };
-
-  // const loadKktData = async () => {
-  //   kktLoading.value = true;
-  //   kktError.value = null;
-  //
-  //   try {
-  //     if (!userStore.contractId) {
-  //       await userStore.getUser();
-  //     }
-  //
-  //     kktData.value = await fetchReport(userStore.contractId?.toString() || "");
-  //
-  //     if (kktData.value?.payload) {
-  //       initialData.value = JSON.parse(JSON.stringify(kktData.value.payload));
-  //       cashersStore.loadFromApi(kktData.value.payload);
-  //       cashersState.value = JSON.stringify(kktData.value.payload);
-  //     }
-  //   } catch (err) {
-  //     console.error("Ошибка при загрузке данных:", err);
-  //     kktError.value = err instanceof Error ? err : new Error("Unknown error");
-  //     showMessage("Ошибка при загрузке данных", true);
-  //   } finally {
-  //     kktLoading.value = false;
-  //     isInitialLoad.value = false;
-  //   }
-  // };
+  const showMessage = (message: string, error = false) => {
+    saveMessage.value = message;
+    isError.value = error;
+    setTimeout(() => {
+      saveMessage.value = "";
+    }, 3000);
+  };
 
   onMounted(async () => {
-    // reportStore.clearFormData();
-    // await loadKktData();
-    console.log("главаная");
+    try {
+      await loadKktData();
+    } catch (err) {
+      showMessage("Ошибка при загрузке данных ККТ", true);
+    }
   });
 </script>
 
@@ -131,13 +71,12 @@
         </span>
       </li>
 
-      <!-- Данные ККТ -->
-      <template v-else-if="kktData?.payload?.length">
+      <template v-else-if="kktData?.length">
         <li
-          v-for="(kkt, index) in kktData.payload"
+          v-for="(kkt, index) in kktData"
           :key="`kkt-${index}`"
           class="home-view__item"
-          :class="{ 'border-b-0': index === kktData.payload.length - 1 }"
+          :class="{ 'border-b-0': index === kktData.length - 1 }"
         >
           <span class="home-view__item-text medium">
             Регистрационный номер ККТ {{ index + 1 }}
@@ -226,3 +165,4 @@
     }
   }
 </style>
+
