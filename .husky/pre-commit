@@ -1,2 +1,7 @@
 #!/bin/sh
-npx lint-staged
+. "$(dirname "$0")/_/husky.sh"
+
+npx lint-staged --no-stash || {
+  echo "❌ Линтинг провален, но изменения сохранены в рабочей директории"
+  exit 1
+}

@@ -33,6 +33,7 @@
     try {
       await loadKktData();
     } catch (err) {
+      console.log(err);
       showMessage("Ошибка при загрузке данных ККТ", true);
     }
   });
@@ -165,4 +166,3 @@
     }
   }
 </style>
-

@@ -4,7 +4,7 @@
   import { useApi } from "~/composables/useApi";
 
   const userStore = useUserStore();
-  const { data: userData, isLoading, error, fetchData } = useApi<unknown>();
+  const { isLoading, error } = useApi<unknown>();
 
   const authStore = useAuthStore();
 
@@ -73,7 +73,7 @@
 
       <div :class="$style.statusBtns">
         <ModuleLogoutPopover
-          :isLoading="isLoading"
+          :is-loading="isLoading"
           @confirm="handleLogoutConfirm"
           @show-bg="showLogoutBg"
         />
@@ -156,4 +156,3 @@
     font-size: rem(14);
   }
 </style>
-

@@ -1,0 +1,6 @@
+
+# Auto-add newline to files
+*.ts
+*.vue
+*.js
+eol=lf

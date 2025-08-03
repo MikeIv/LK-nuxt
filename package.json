@@ -67,11 +67,18 @@
   },
   "lint-staged": {
     "*.{js,ts,vue}": [
-      "eslint --fix",
-      "prettier --write"
+      "eslint --fix --max-warnings 0",
+      "prettier --write --ignore-unknown"
     ],
     "*.{css,scss}": [
+      "stylelint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
       "prettier --write"
     ]
+  },
+  "eslintConfig": {
+    "root": true
   }
 }
