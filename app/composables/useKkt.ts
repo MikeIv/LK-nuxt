@@ -12,7 +12,7 @@ export const useKkt = () => {
     isLoading: kktLoading,
     error: kktError,
     fetchData,
-  } = useApi<any[]>();
+  } = useApi<unknown[]>();
 
   const loadKktData = async (): Promise<boolean> => {
     try {
@@ -31,7 +31,7 @@ export const useKkt = () => {
       });
 
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Ошибка при загрузке данных ККТ:", err);
 
       // Попробуем обновить токен, если ошибка 401
@@ -56,4 +56,3 @@ export const useKkt = () => {
     loadKktData,
   };
 };
-

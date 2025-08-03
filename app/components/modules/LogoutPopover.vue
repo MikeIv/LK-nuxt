@@ -3,7 +3,7 @@
   // import IconLogout from "~/components/icons/IconLogout.vue";
   // import IconExclamation from "~/components/icons/IconExclamation.vue";
 
-  const props = defineProps({
+  defineProps({
     isLoading: { type: Boolean, default: false },
     showBg: { default: false },
   });
@@ -28,7 +28,7 @@
 
     <div v-if="open" :class="$style.popupBg" @click="showBg" />
 
-    <PopoverPanel :class="$style.confirm" static v-if="open">
+    <PopoverPanel v-if="open" :class="$style.confirm" static>
       <div :class="$style.content">
         <IconExclamation :class="$style.icon" />
         <h3 :class="$style.title">Подтверждение выхода</h3>
@@ -36,12 +36,12 @@
 
         <div :class="$style.buttons">
           <button
-            @click="handleConfirm(true)"
             :class="[$style.btn, $style.btnContinue]"
+            @click="handleConfirm(true)"
           >
             Продолжить
           </button>
-          <button @click="close" :class="[$style.btn, $style.btnCancel]">
+          <button :class="[$style.btn, $style.btnCancel]" @click="close">
             Вернуться
           </button>
         </div>
@@ -176,4 +176,3 @@
     z-index: z.z(modal, overlay);
   }
 </style>
-
