@@ -5,16 +5,24 @@
 
   const userStore = useUserStore();
   const { isLoading } = useApi();
-
-  definePageMeta({
-    middleware: "auth",
-  });
-
   const sidebarCollapsed = useLocalStorage("sidebarCollapsed", false);
 
-  const toggleSidebar = () => {
-    sidebarCollapsed.value = !sidebarCollapsed.value;
-  };
+  const toggleSidebar = () =>
+    (sidebarCollapsed.value = !sidebarCollapsed.value);
+
+  const navLinks = [
+    { to: "/", icon: "i-home", text: "На главную" },
+    { to: "/record", icon: "i-report", text: "Сформировать отчет" },
+    { to: "/archive", icon: "i-archive", text: "Архив отчетов" },
+    { to: "/cashiers", icon: "i-cashier", text: "Мои кассы" },
+  ];
+
+  const debtStatus = computed(() => ({
+    hasDebt: userStore.user?.debt > 0,
+    debtCount: userStore.user?.debt,
+    iconColor: userStore.user?.debt > 0 ? "var(--a-error)" : "var(--a-success)",
+    bgClass: userStore.user?.debt > 0 ? "hasDebt" : "noDebt",
+  }));
 
   onMounted(async () => {
     try {
@@ -38,40 +46,27 @@
       :class="[
         $style.item,
         $style.itemStart,
-        {
-          '!max-w-[160px]': sidebarCollapsed,
-          [$style.hasDebt]: userStore.user?.debt > 0,
-          [$style.noDebt]: userStore.user?.debt === 0,
-        },
+        { '!max-w-[160px]': sidebarCollapsed },
+        $style[debtStatus.bgClass],
       ]"
     >
       <UIcon
         name="i-ok-icon"
         :class="$style.icon"
-        :style="{
-          color:
-            userStore.user?.debt > 0 ? 'var(--a-error)' : 'var(--a-success)',
-        }"
+        :style="{ color: debtStatus.iconColor }"
       />
       <div v-if="!sidebarCollapsed" :class="$style.title">
-        <span v-if="userStore.user?.debt > 0">
-          Есть задолженность: {{ userStore.user?.debt }} отчет
-        </span>
-        <span v-else>Задолженности нет</span>
+        {{
+          debtStatus.hasDebt
+            ? `Есть задолженность: ${debtStatus.debtCount} отчет`
+            : "Задолженности нет"
+        }}
       </div>
     </div>
 
     <!-- Навигационное меню -->
     <ul :class="$style.list">
-      <li
-        v-for="link in [
-          { to: '/', icon: 'i-home', text: 'На главную' },
-          { to: '/record', icon: 'i-report', text: 'Сформировать отчет' },
-          { to: '/archive', icon: 'i-archive', text: 'Архив отчетов' },
-          { to: '/cashiers', icon: 'i-cashier', text: 'Мои кассы' },
-        ]"
-        :key="link.to"
-      >
+      <li v-for="link in navLinks" :key="link.to">
         <NuxtLink
           :to="link.to"
           :class="[
@@ -79,12 +74,12 @@
             $style.link,
             { '!max-w-[160px]': sidebarCollapsed },
           ]"
-          active-class="active-link"
+          :active-class="$style.activeLink"
         >
           <UIcon :name="link.icon" :class="$style.iconLink" />
-          <span v-if="!sidebarCollapsed" :class="$style.title">{{
-            link.text
-          }}</span>
+          <span v-if="!sidebarCollapsed" :class="$style.title">
+            {{ link.text }}
+          </span>
         </NuxtLink>
       </li>
     </ul>
@@ -98,15 +93,11 @@
         :name="sidebarCollapsed ? 'i-not-collapsed' : 'i-collapsed'"
         :class="$style.iconLink"
       />
-      <span v-if="!sidebarCollapsed" :class="$style.stateTitle">
-        Свернуть панель
-      </span>
-      <span v-else :class="$style.stateTitle">
-        Развернуть <span>панель</span>
+      <span :class="$style.stateTitle">
+        {{ sidebarCollapsed ? "Развернуть панель" : "Свернуть панель" }}
       </span>
     </button>
 
-    <!-- Индикатор загрузки -->
     <div v-if="isLoading" :class="$style.loading">Загрузка данных...</div>
   </section>
 </template>
@@ -124,34 +115,9 @@
   .logoIcon {
     position: absolute;
     top: rem(24);
-    left: rem(40);
+    left: 0;
     width: rem(100);
     height: rem(100);
-    color: var(--a-white);
-  }
-
-  .item {
-    display: flex;
-    align-items: center;
-    height: rem(48);
-    padding: 0 rem(18);
-    font-size: rem(16);
-    cursor: pointer;
-    transition: all 0.3s ease;
-
-    &:hover {
-      background-color: var(--a-bgAccentExLight);
-    }
-
-    &.active-link {
-      background-color: var(--a-bgAccentExLight);
-    }
-  }
-
-  .itemStart {
-    height: rem(60);
-    margin-bottom: rem(40);
-    font-size: rem(18);
     color: var(--a-white);
   }
 
@@ -167,7 +133,32 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    gap: rem(8);
+    gap: rem(16);
+  }
+
+  .item {
+    display: flex;
+    align-items: center;
+    height: rem(48);
+    padding: 0 rem(18);
+    font-size: rem(16);
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background-color: var(--a-bgAccentExLight);
+    }
+  }
+
+  .itemStart {
+    height: rem(60);
+    margin-bottom: rem(40);
+    font-size: rem(18);
+    color: var(--a-white);
+  }
+
+  .activeLink {
+    background-color: var(--a-bgAccentExLight);
   }
 
   .title {
