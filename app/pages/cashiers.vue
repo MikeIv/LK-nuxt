@@ -2,64 +2,75 @@
   // import { computed, nextTick, onMounted, ref, watch } from "vue";
   // import IconCloseBtn from "@/components/icons/IconCloseBtn.vue";
   // import IconEditing from "@/components/icons/IconEditing.vue";
-  // import { useCashersStore } from "~/stores/cashers";
-  import VueDatePicker from "@vuepic/vue-datepicker";
-  import "@vuepic/vue-datepicker/dist/main.css";
+
+  // import VueDatePicker from "@vuepic/vue-datepicker";
+  // import "@vuepic/vue-datepicker/dist/main.css";
   // import { useSaveCashiers } from "~/composables/useSaveCashiers";
   // import { useLogin } from "~/stores/auth.ts";
 
-  // const { kktData, kktLoading, kktError, loadKktData } = useKkt();
+  import { useCashersStore } from "~/stores/cashers";
+  import VueDatePicker from "@vuepic/vue-datepicker";
+  import "@vuepic/vue-datepicker/dist/main.css";
 
-  // const store = useLogin();
   const cashersStore = useCashersStore();
-  // const { data, loading, fetchReport } = useDataKkt();
-  // const { saveCashiers, error: saveError } = useSaveCashiers();
 
-  interface Casher {
-    id: number | null;
-    name: string;
-    registration_number: string;
-    serial_number: string;
-    fn_number: string;
-    registered_at: string | null;
-    installed_at: string | null;
-    order: number;
-    isEditingTitle?: boolean;
-    isCustom?: boolean;
-    tempId?: string;
-    isDirty?: boolean;
-  }
+  const { kktData, kktLoading, kktError, loadKktData } = useKkt();
+  console.log("kktData", kktData);
+  console.log("kktError", kktError);
 
   const saveMessage = ref("");
   const isError = ref(false);
-  const isSaving = ref(false);
+
+  // const store = useLogin();
+  // const cashersStore = useCashersStore();
+  // const { data, loading, fetchReport } = useDataKkt();
+  // const { saveCashiers, error: saveError } = useSaveCashiers();
+
+  // interface Casher {
+  //   id: number | null;
+  //   name: string;
+  //   registration_number: string;
+  //   serial_number: string;
+  //   fn_number: string;
+  //   registered_at: string | null;
+  //   installed_at: string | null;
+  //   order: number;
+  //   isEditingTitle?: boolean;
+  //   isCustom?: boolean;
+  //   tempId?: string;
+  //   isDirty?: boolean;
+  // }
+
+  // const saveMessage = ref("");
+  // const isError = ref(false);
+  // const isSaving = ref(false);
   const titleInputs = ref<HTMLInputElement[]>([]);
-  const initialData = ref<Casher[]>([]);
-  const isInitialLoad = ref(true);
+  // const initialData = ref<Casher[]>([]);
+  // const isInitialLoad = ref(true);
 
-  const updateData = async () => {
-    if (!hasChanges.value) {
-      showMessage("Нет изменений для отмены");
-      return;
-    }
-
-    if (!confirm("Все несохраненные изменения будут потеряны. Продолжить?")) {
-      return;
-    }
-
-    isSaving.value = true;
-    try {
-      cashersStore.resetChanges();
-      // Возвращаем initialData после отмены
-      initialData.value = JSON.parse(JSON.stringify(cashersStore.initialData));
-      showMessage("Изменения отменены");
-    } catch (err) {
-      console.error("Ошибка при отмене изменений:", err);
-      showMessage("Ошибка при отмене изменений", true);
-    } finally {
-      isSaving.value = false;
-    }
-  };
+  // const updateData = async () => {
+  //   if (!hasChanges.value) {
+  //     showMessage("Нет изменений для отмены");
+  //     return;
+  //   }
+  //
+  //   if (!confirm("Все несохраненные изменения будут потеряны. Продолжить?")) {
+  //     return;
+  //   }
+  //
+  //   isSaving.value = true;
+  //   try {
+  //     cashersStore.resetChanges();
+  //     // Возвращаем initialData после отмены
+  //     initialData.value = JSON.parse(JSON.stringify(cashersStore.initialData));
+  //     showMessage("Изменения отменены");
+  //   } catch (err) {
+  //     console.error("Ошибка при отмене изменений:", err);
+  //     showMessage("Ошибка при отмене изменений", true);
+  //   } finally {
+  //     isSaving.value = false;
+  //   }
+  // };
 
   const validateRegistrationNumber = (
     event: Event,
@@ -82,7 +93,7 @@
       clearFieldError(fieldKey);
     }
   };
-
+  //
   const validateDigitsInput = (
     event: Event,
     field: string,
@@ -98,7 +109,7 @@
     const fieldKey = `${field === "serial_number" ? "serialNum" : "fnNum"}-${index}`;
     clearFieldError(fieldKey);
   };
-
+  //
   const invalidFields = ref<Record<string, boolean>>({});
 
   // const validateBeforeSave = () => {
@@ -136,21 +147,21 @@
   //   return Object.keys(invalidFields.value).length === 0;
   // };
 
-  watch(
-    () => cashersStore.allCashers,
-    (newVal) => {
-      newVal.forEach((block, index) => {
-        if (block.serial_number?.trim()) {
-          clearFieldError(`serialNum-${index}`);
-        }
-        if (block.fn_number?.trim()) {
-          clearFieldError(`fnNum-${index}`);
-        }
-      });
-    },
-    { deep: true },
-  );
-
+  // watch(
+  //   () => cashersStore.allCashers,
+  //   (newVal) => {
+  //     newVal.forEach((block, index) => {
+  //       if (block.serial_number?.trim()) {
+  //         clearFieldError(`serialNum-${index}`);
+  //       }
+  //       if (block.fn_number?.trim()) {
+  //         clearFieldError(`fnNum-${index}`);
+  //       }
+  //     });
+  //   },
+  //   { deep: true },
+  // );
+  //
   const handleFieldChange = (block: unknown) => {
     block.isDirty = true;
   };
@@ -192,14 +203,14 @@
       );
     }
   };
-
+  //
   const clearFieldError = (fieldKey: string) => {
     if (invalidFields.value[fieldKey]) {
       const { [fieldKey]: _, ...rest } = invalidFields.value;
       invalidFields.value = rest;
     }
   };
-
+  //
   const handleTitleEditEnd = (block: unknown, index: number) => {
     if (!block.name.trim()) {
       block.name = "Касса " + block.order;
@@ -207,13 +218,12 @@
     block.isEditingTitle = false;
     handleFieldChange(block);
 
-    // Сбрасываем ошибку названия
     const fieldKey = `name-${index}`;
     if (block.name.trim()) {
       clearFieldError(fieldKey);
     }
   };
-
+  //
   const addBlock = () => {
     const blockNumber = cashersStore.allCashers.length + 1;
     const name = `Касса ${blockNumber}`;
@@ -237,7 +247,7 @@
       lastInput?.focus();
     });
   };
-
+  //
   const removeBlock = async (block: unknown) => {
     if (!confirm("Вы уверены, что хотите удалить эту кассу?")) return;
     cashersStore.removeCasher({
@@ -276,51 +286,51 @@
   //   }
   // };
 
-  const hasChanges = computed(() => {
-    if (isInitialLoad.value || !cashersStore.allCashers.length) return false;
-
-    // Сравниваем текущее состояние с исходным
-    const currentState = cashersStore.allCashers.map((c) => ({
-      name: c.name,
-      registration_number: c.registration_number,
-      serial_number: c.serial_number,
-      fn_number: c.fn_number,
-      registered_at: c.registered_at,
-      installed_at: c.installed_at,
-      order: c.order,
-      id: c.id,
-    }));
-
-    const initialState = initialData.value.map((c) => ({
-      name: c.name,
-      registration_number: c.registration_number,
-      serial_number: c.serial_number,
-      fn_number: c.fn_number,
-      registered_at: c.registered_at,
-      installed_at: c.installed_at,
-      order: c.order,
-      id: c.id,
-    }));
-
-    // Проверяем изменения в данных
-    const dataChanged =
-      JSON.stringify(currentState) !== JSON.stringify(initialState);
-
-    // Проверяем наличие новых касс (без id)
-    const hasNewCashers = cashersStore.allCashers.some((c) => c.id === null);
-
-    return dataChanged || hasNewCashers;
-  });
-
-  // Вспомогательные функции
-  const showMessage = (message: string, error = false) => {
-    saveMessage.value = message;
-    isError.value = error;
-    setTimeout(() => {
-      saveMessage.value = "";
-    }, 3000);
-  };
-
+  // const hasChanges = computed(() => {
+  //   if (isInitialLoad.value || !cashersStore.allCashers.length) return false;
+  //
+  //   // Сравниваем текущее состояние с исходным
+  //   const currentState = cashersStore.allCashers.map((c) => ({
+  //     name: c.name,
+  //     registration_number: c.registration_number,
+  //     serial_number: c.serial_number,
+  //     fn_number: c.fn_number,
+  //     registered_at: c.registered_at,
+  //     installed_at: c.installed_at,
+  //     order: c.order,
+  //     id: c.id,
+  //   }));
+  //
+  //   const initialState = initialData.value.map((c) => ({
+  //     name: c.name,
+  //     registration_number: c.registration_number,
+  //     serial_number: c.serial_number,
+  //     fn_number: c.fn_number,
+  //     registered_at: c.registered_at,
+  //     installed_at: c.installed_at,
+  //     order: c.order,
+  //     id: c.id,
+  //   }));
+  //
+  //   // Проверяем изменения в данных
+  //   const dataChanged =
+  //     JSON.stringify(currentState) !== JSON.stringify(initialState);
+  //
+  //   // Проверяем наличие новых касс (без id)
+  //   const hasNewCashers = cashersStore.allCashers.some((c) => c.id === null);
+  //
+  //   return dataChanged || hasNewCashers;
+  // });
+  //
+  // // Вспомогательные функции
+  // const showMessage = (message: string, error = false) => {
+  //   saveMessage.value = message;
+  //   isError.value = error;
+  //   setTimeout(() => {
+  //     saveMessage.value = "";
+  //   }, 3000);
+  // };
+  //
   const formatDate = (date: string | null): string => {
     if (!date) return "--.--.----";
     return new Date(date)
@@ -331,16 +341,16 @@
       })
       .replace(/\//g, ".");
   };
-
-  const cashersState = ref(JSON.stringify(cashersStore.allCashers));
-
-  watch(
-    () => cashersStore.allCashers,
-    (newVal) => {
-      cashersState.value = JSON.stringify(newVal);
-    },
-    { deep: true },
-  );
+  //
+  // const cashersState = ref(JSON.stringify(cashersStore.allCashers));
+  //
+  // watch(
+  //   () => cashersStore.allCashers,
+  //   (newVal) => {
+  //     cashersState.value = JSON.stringify(newVal);
+  //   },
+  //   { deep: true },
+  // );
 
   // const waitForContractId = async (maxAttempts = 5, delay = 200) => {
   //   for (let i = 0; i < maxAttempts; i++) {
@@ -350,7 +360,21 @@
   //   throw new Error("Contract ID not available");
   // };
 
+  const showMessage = (message: string, error = false) => {
+    saveMessage.value = message;
+    isError.value = error;
+    setTimeout(() => {
+      saveMessage.value = "";
+    }, 3000);
+  };
+
   onMounted(async () => {
+    try {
+      await loadKktData();
+    } catch (err) {
+      console.log(err);
+      showMessage("Ошибка при загрузке данных ККТ", true);
+    }
     // try {
     //   const contractId = await waitForContractId();
     //   await fetchReport(contractId.toString());
@@ -375,32 +399,34 @@
       main-title="Мои кассы"
       step-title="Добавляйте и редактируйте информацию о Ваших кассах"
     />
-    <section class="record__view">
-      <div v-if="loading">Загрузка данных...</div>
+    <section :class="cashes.content">
+      <div v-if="kktLoading">Загрузка данных...</div>
 
       <template v-else>
-        <section class="casher-section">
+        <section :class="cashes.section">
           <div
-            v-for="(block, index) in cashersStore.allCashers"
+            v-for="(block, index) in kktData"
             :key="block.id || `custom-${index}`"
-            class="record__item casher-block"
+            :class="cashes.table"
           >
-            <div class="casher-block__title-wrapper">
+            <div :class="cashes.titleWrapper">
               <input
                 v-if="block.isEditingTitle"
                 ref="titleInput"
                 v-model="block.name"
-                class="casher-block__title-input"
-                :class="{
-                  'casher-block__title-input--edting': block.isEditingTitle,
-                  'error-field': invalidFields[`name-${index}`],
-                }"
+                :class="[
+                  {
+                    'cashes.editing': block.isEditingTitle,
+                    'error-field': invalidFields[`name-${index}`],
+                  },
+                  cashes.titleInput,
+                ]"
                 type="text"
                 placeholder="Введите название кассы"
                 @keyup.enter="handleTitleEditEnd(block)"
                 @blur="handleTitleEditEnd(block, index)"
               />
-              <p v-else class="casher-block__title-text">
+              <p v-else :class="cashes.titleText">
                 {{ block.name || "Не указано" }}
               </p>
 
@@ -419,7 +445,7 @@
                 type="button"
                 @click.stop="handleTitleEditStart(block)"
               >
-                <IconEditing class="main-sidebar__icon small" />
+                <UIcon name="i-edit-icon" class="main-sidebar__icon small" />
               </button>
             </div>
 
@@ -523,12 +549,6 @@
                       handleDateChange(block, 'registered_at', date, index)
                   "
                 />
-                <!--              <small-->
-                <!--                  v-if="invalidFields[`regDate-${index}`]"-->
-                <!--                  class="casher-block__error-message"-->
-                <!--              >-->
-                <!--                Обязательное поле-->
-                <!--              </small>-->
               </div>
               <div class="casher-block__column">
                 <span class="casher-block__col-title"
@@ -557,12 +577,6 @@
                       handleDateChange(block, 'installed_at', date, index)
                   "
                 />
-                <!--              <small-->
-                <!--                  v-if="invalidFields[`instDate-${index}`]"-->
-                <!--                  class="casher-block__error-message"-->
-                <!--              >-->
-                <!--                Обязательное поле-->
-                <!--              </small>-->
               </div>
 
               <button
@@ -570,7 +584,7 @@
                 class="casher-block__delete-btn"
                 @click="removeBlock(block)"
               >
-                <IconCloseBtn class="casher-block__icon" />
+                <UIcon name="i-close-btn" class="casher-block__icon" />
               </button>
             </div>
           </div>
@@ -585,37 +599,37 @@
         </div>
       </div>
 
-      <div class="record__btn-row record__actions">
-        <button
-          class="record__btn ghost"
-          :disabled="!hasChanges || isSaving"
-          @click="saveData"
-        >
-          <span class="record__btn-title">{{
-            isSaving ? "Сохранение..." : "Сохранить"
-          }}</span>
-        </button>
+      <!--      <div class="record__btn-row record__actions">-->
+      <!--        <button-->
+      <!--          class="record__btn ghost"-->
+      <!--          :disabled="!hasChanges || isSaving"-->
+      <!--          @click="saveData"-->
+      <!--        >-->
+      <!--          <span class="record__btn-title">{{-->
+      <!--            isSaving ? "Сохранение..." : "Сохранить"-->
+      <!--          }}</span>-->
+      <!--        </button>-->
 
-        <button
-          class="record__btn ghost"
-          :disabled="!hasChanges || isSaving"
-          @click="updateData"
-        >
-          <span class="record__btn-title">{{
-            isSaving ? "Отмена..." : "Отменить"
-          }}</span>
-        </button>
+      <!--        <button-->
+      <!--          class="record__btn ghost"-->
+      <!--          :disabled="!hasChanges || isSaving"-->
+      <!--          @click="updateData"-->
+      <!--        >-->
+      <!--          <span class="record__btn-title">{{-->
+      <!--            isSaving ? "Отмена..." : "Отменить"-->
+      <!--          }}</span>-->
+      <!--        </button>-->
 
-        <transition name="fade">
-          <div
-            v-if="saveMessage"
-            class="record__flag-message"
-            :class="{ error: isError }"
-          >
-            {{ saveMessage }}
-          </div>
-        </transition>
-      </div>
+      <!--        &lt;!&ndash;        <transition name="fade">&ndash;&gt;-->
+      <!--        &lt;!&ndash;          <div&ndash;&gt;-->
+      <!--        &lt;!&ndash;            v-if="saveMessage"&ndash;&gt;-->
+      <!--        &lt;!&ndash;            class="record__flag-message"&ndash;&gt;-->
+      <!--        &lt;!&ndash;            :class="{ error: isError }"&ndash;&gt;-->
+      <!--        &lt;!&ndash;          >&ndash;&gt;-->
+      <!--        &lt;!&ndash;            {{ saveMessage }}&ndash;&gt;-->
+      <!--        &lt;!&ndash;          </div>&ndash;&gt;-->
+      <!--        &lt;!&ndash;        </transition>&ndash;&gt;-->
+      <!--      </div>-->
     </section>
   </div>
 </template>
@@ -624,15 +638,81 @@
   .cashes {
     background: var(--a-white);
   }
-</style>
 
-<style lang="scss">
-  .casher-section {
+  .content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .section {
     display: flex;
     flex-direction: column;
     margin-bottom: rem(40);
   }
 
+  .table {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    max-width: rem(1000);
+    min-height: rem(80);
+    padding: rem(12) rem(24);
+    background-color: var(--a-bgTable);
+    border-radius: rem(12);
+    margin-bottom: rem(20);
+    transition: all 0.3s ease;
+    -webkit-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    -moz-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .titleWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: auto;
+    margin-bottom: rem(20);
+  }
+
+  .titleInput {
+    flex: 1;
+    margin-right: auto;
+    padding: rem(4) rem(12);
+    border: 1px solid var(--a-borderAccentLight);
+    border-radius: rem(4);
+    font-size: rem(12);
+    font-weight: 600;
+    background-color: var(--a-bgTable);
+    transition: border-color 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: var(--a-primary);
+    }
+  }
+
+  .editing {
+    background-color: var(--a-white);
+  }
+
+  .titleText {
+    flex: 1;
+    max-width: rem(800);
+    margin: 0;
+    padding: rem(8) rem(14);
+    font-size: rem(13);
+    font-weight: 600;
+    line-height: 1.2;
+    background-color: var(--a-white);
+  }
+</style>
+
+<style lang="scss">
   .casher-block {
     position: relative;
     display: flex;
