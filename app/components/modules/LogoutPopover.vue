@@ -28,7 +28,7 @@
 
     <PopoverPanel v-if="open" :class="$style.confirm" static>
       <div :class="$style.content">
-        <IconExclamation :class="$style.icon" />
+        <UIcon name="i-exclamation" :class="$style.icon" />
         <h3 :class="$style.title">Подтверждение выхода</h3>
         <p :class="$style.message">Все не сохраненные данные будут утеряны</p>
 

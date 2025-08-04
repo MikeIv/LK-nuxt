@@ -22,7 +22,7 @@
       :disabled="!hasContractsToShow || isLoading"
       aria-label="Переключиться между договорами"
     >
-      <UIcon name="i-switch" :class="$style.iconSwitch" />
+      <UIcon name="i-switch-icon" :class="$style.iconSwitch" />
       <span :class="$style.btnText">Переключиться</span>
     </PopoverButton>
 
