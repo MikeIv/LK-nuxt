@@ -6,13 +6,13 @@ type ApiResponse<T> = {
 
 type ApiOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  body?: any;
+  body?: unknown;
   headers?: Record<string, string>;
 };
 
 export const useApi = <T>() => {
   const data: Ref<T | null> = ref(null);
-  const error: Ref<string | null> = ref(null);
+  const error = ref<Error | string | null>(null);
   const isLoading: Ref<boolean> = ref(false);
 
   const fetchData = async (
@@ -55,4 +55,3 @@ export const useApi = <T>() => {
     fetchData,
   };
 };
-

@@ -25,26 +25,82 @@
   const showLogoutBg = ref(false);
 
   const handleLogoutConfirm = async (proceed: boolean) => {
-    showLogoutConfirm.value = false;
-    showLogoutBg.value = true;
+    if (!proceed) {
+      showLogoutConfirm.value = false;
+      return;
+    }
 
-    if (!proceed) return;
+    showLogoutBg.value = true;
 
     try {
       isLoading.value = true;
-      error.value = null;
       await authStore.logOut();
 
-      if (authStore.useApiDataOnly) {
-        authStore.$reset();
+      if (import.meta.env.VITE_API_DATA_ONLY_MODE) {
+        authStore.$patch({
+          token: null,
+          error: null,
+          isLoading: false,
+        });
       }
     } catch (e) {
       error.value =
         e instanceof Error ? e : new Error("Ошибка выхода из системы");
       console.error("Logout error:", e);
+
+      useToast().add({
+        title: "Ошибка выхода",
+        description: "Не удалось завершить сеанс",
+        color: "red",
+        icon: "i-heroicons-exclamation-triangle",
+        ui: {
+          background: "bg-red-50 dark:bg-red-900/50",
+          title: "text-red-800 dark:text-red-100",
+          description: "text-red-700 dark:text-red-200",
+        },
+      });
     } finally {
       isLoading.value = false;
       showLogoutBg.value = false;
+    }
+  };
+
+  const filteredContracts = computed(() => {
+    return (
+      userStore.user?.contracts?.filter(
+        (contract) => contract.id !== userStore.user?.id,
+      ) ?? []
+    );
+  });
+
+  const hasContractsToShow = computed(() => filteredContracts.value.length > 0);
+
+  const handleContractChange = async (contractId: number) => {
+    const { isLoading, error } = useApi<unknown>();
+
+    try {
+      isLoading.value = true;
+      error.value = null;
+
+      await userStore.changeContract(contractId);
+
+      await refreshNuxtData();
+      await navigateTo({ path: "/" }, { replace: true });
+    } catch (e: unknown) {
+      error.value =
+        e instanceof Error
+          ? e
+          : new Error("Ошибка переключения договора", { cause: e });
+
+      console.error("Failed to change contract:", error.value);
+
+      useToast().add({
+        title: "Ошибка переключения",
+        description: "Не удалось изменить текущий договор",
+        type: "custom-error",
+      });
+    } finally {
+      isLoading.value = false;
     }
   };
 
@@ -76,6 +132,12 @@
           :is-loading="isLoading"
           @confirm="handleLogoutConfirm"
           @show-bg="showLogoutBg"
+        />
+        <ModuleContractPopover
+          :is-loading="isLoading"
+          :has-contracts-to-show="hasContractsToShow"
+          :filtered-contracts="filteredContracts"
+          @change="handleContractChange"
         />
       </div>
     </div>

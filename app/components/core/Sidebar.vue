@@ -4,7 +4,7 @@
   import { useApi } from "~/composables/useApi";
 
   const userStore = useUserStore();
-  const { isLoading, error } = useApi();
+  const { isLoading } = useApi();
 
   definePageMeta({
     middleware: "auth",
@@ -225,4 +225,3 @@
     font-size: rem(14);
   }
 </style>
-

@@ -169,6 +169,39 @@ export default defineNuxtConfig({
     ],
   },
 
+  ui: {
+    notifications: {
+      variants: {
+        "custom-error": {
+          color: "red",
+          ui: {
+            background: "bg-[#991b1b]",
+            title: "text-white font-bold",
+            description: "text-rose-100",
+          },
+        },
+      },
+    },
+  },
+
+  toast: {
+    position: "top-right",
+    register: [
+      {
+        name: "custom-error",
+        options: {
+          icon: "error",
+          type: "error",
+          style: {
+            background: "#991b1b",
+            color: "#fff",
+            borderLeft: "4px solid #dc2626",
+          },
+        },
+      },
+    ],
+  },
+
   routeRules: {
     "/": { prerender: true, static: true },
     "/assets/**": {

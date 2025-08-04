@@ -1,11 +1,9 @@
 <script setup lang="ts">
   import { Popover, PopoverButton, PopoverPanel } from "@headlessui/vue";
-  // import IconLogout from "~/components/icons/IconLogout.vue";
-  // import IconExclamation from "~/components/icons/IconExclamation.vue";
 
   defineProps({
     isLoading: { type: Boolean, default: false },
-    showBg: { default: false },
+    showBg: { type: Boolean, default: false },
   });
 
   const emit = defineEmits(["confirm", "showConfirm"]);
