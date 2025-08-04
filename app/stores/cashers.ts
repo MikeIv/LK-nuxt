@@ -13,6 +13,8 @@ interface Casher {
   isCustom?: boolean;
   tempId?: string;
   isDirty?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const useCashersStore = defineStore("cashers", () => {
@@ -25,7 +27,6 @@ export const useCashersStore = defineStore("cashers", () => {
     ...customCashers.value,
   ]);
 
-  // Загружаем данные из API
   const loadFromApi = (apiData: Casher[]) => {
     // Создаем глубокую копию данных
     initialData.value = JSON.parse(JSON.stringify(apiData));
@@ -75,6 +76,24 @@ export const useCashersStore = defineStore("cashers", () => {
     }
   };
 
+  const updateCasher = (updatedCasher: Casher) => {
+    if (updatedCasher.id === null) {
+      const index = customCashers.value.findIndex(
+        (c) => c.tempId === updatedCasher.tempId,
+      );
+      if (index !== -1) {
+        customCashers.value[index] = updatedCasher;
+      }
+    } else {
+      const index = originalCashers.value.findIndex(
+        (c) => c.id === updatedCasher.id,
+      );
+      if (index !== -1) {
+        originalCashers.value[index] = updatedCasher;
+      }
+    }
+  };
+
   const getChanges = () => {
     return allCashers.value;
   };
@@ -89,5 +108,6 @@ export const useCashersStore = defineStore("cashers", () => {
     removeCasher,
     getChanges,
     resetChanges,
+    updateCasher,
   };
 });
