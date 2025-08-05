@@ -1,5 +1,22 @@
+<script setup lang="ts">
+  interface Props {
+    step: string | number;
+    showBack?: boolean;
+    showNext?: boolean;
+  }
+
+  withDefaults(defineProps<Props>(), {
+    showBack: true,
+    showNext: true,
+  });
+
+  defineOptions({
+    inheritAttrs: true,
+  });
+</script>
+
 <template>
-  <div v-bind="$attrs" class="navigation">
+  <div v-bind="$attrs" :class="$style.navigation">
     <slot name="back">
       <NuxtLink
         v-if="showBack"
@@ -20,19 +37,13 @@
   </div>
 </template>
 
-<script setup lang="ts">
-  interface Props {
-    step: string | number;
-    showBack?: boolean;
-    showNext?: boolean;
+<style module lang="scss">
+  .navigation {
+    display: flex;
+    gap: rem(20);
+    align-items: center;
+    margin-top: auto;
+    font-size: rem(14);
+    font-weight: 600;
   }
-
-  withDefaults(defineProps<Props>(), {
-    showBack: true,
-    showNext: true,
-  });
-
-  defineOptions({
-    inheritAttrs: true,
-  });
-</script>
+</style>

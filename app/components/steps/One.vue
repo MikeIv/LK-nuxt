@@ -10,7 +10,9 @@
     <h2>Шаг 1: Ввод данных</h2>
     <StepsNavigation :step="1" :show-back="false">
       <template #next>
-        <button class="btn" @click="validateAndNext">Далее</button>
+        <button class="steps-nav-btn solid" @click="validateAndNext">
+          Далее
+        </button>
       </template>
     </StepsNavigation>
   </div>
