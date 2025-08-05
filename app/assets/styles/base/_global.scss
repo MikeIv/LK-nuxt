@@ -1,15 +1,17 @@
 @use "../variables/_base-font-size.scss" as size;
+@use "~/assets/styles/tools/functions" as *;
 
 html,
 body {
   font-size: size.$base-font-size;
+
   //  background-color: var(--a-white) !important;
 }
 
 /** {
   margin: 0;
   padding: 0;
-}*/
+} */
 
 *,
 *::before,
@@ -38,4 +40,33 @@ ul {
 .ring {
   border: none !important;
   box-shadow: none !important;
+}
+
+.steps-nav-btn {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: rem(2) rem(12);
+  width: max-content;
+  flex-shrink: 0;
+  font-size: rem(14);
+  font-weight: 600;
+  border-radius: 0.25rem;
+  transition: background-color 0.3s;
+  cursor: pointer;
+
+  &[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &.solid {
+    background-color: var(--a-accentTextDark);
+  }
+
+  &.ghost {
+    background-color: var(--a-bgLight);
+    border: 1px solid var(--a-borderAccent);
+  }
 }

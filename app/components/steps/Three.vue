@@ -13,20 +13,27 @@
 </script>
 
 <template>
-  <div class="wrapper">
-    <h1>Шаг 3</h1>
-    <StepsNavigation :step="3" :show-back="true" :show-next="true">
-      <template #back>
-        <button class="btn" @click="handleBack">Назад</button>
-      </template>
-      <template #action>
-        <button class="btn" @click="saveData">Сохранить</button>
-      </template>
-      <template #next>
-        <button class="btn" @click="validateAndNext">Далее</button>
-      </template>
-    </StepsNavigation>
-  </div>
+  <StepsHeader
+    step-title="Суммы, подлежащие исключению из размера Денежного оборота в Помещении"
+    :step-current="3"
+    :step-total="4"
+  />
+
+  <StepsNavigation :step="2" :show-back="true" :show-next="true">
+    <template #back>
+      <UButton class="steps-nav-btn ghost" @click="handleBack">Назад</UButton>
+    </template>
+    <template #action>
+      <UButton class="steps-nav-btn ghost" @click="saveData"
+        >Сохранить
+      </UButton>
+    </template>
+    <template #next>
+      <UButton class="steps-nav-btn solid" @click="validateAndNext"
+        >Далее
+      </UButton>
+    </template>
+  </StepsNavigation>
 </template>
 
 <style module lang="scss"></style>

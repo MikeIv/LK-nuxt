@@ -6,21 +6,231 @@
   const saveData = () => {
     console.log("Save data");
   };
+
+  const hasChanges = ref(false);
+
+  const resulTableData = ref({
+    header: [
+      { key: "name", label: "" },
+      { key: "nds", label: "с НДС" },
+      { key: "without_nds", label: "без НДС" },
+    ],
+    body: [
+      {
+        name: "Итого Денежный оборот в Помещении",
+        with_nds: "0",
+        without_nds: "0",
+      },
+      {
+        name: "Процент с Денежного оборота, %",
+        sum: "0",
+      },
+      {
+        name: "Процент с Денежного оборота, руб",
+        with_nds: 0,
+        without_nds: 0,
+      },
+      {
+        name: "База сравнения за отчетный период",
+        sum: "0",
+      },
+      {
+        name: "Плата с Денежного оборота, руб.",
+        with_nds: 0,
+        without_nds: 0,
+      },
+    ],
+  });
+
+  const handleBaseInput = (event: Event, row: unknown) => {
+    const input = event.target as HTMLInputElement;
+    row.sum = input.value.replace(/[^\d.]/g, "");
+    hasChanges.value = true;
+  };
+
+  const formatBaseValue = (row: unknown) => {
+    if (row.sum) {
+      const num = parseFloat(row.sum);
+      if (!isNaN(num)) {
+        row.sum = num.toFixed(2);
+      }
+    }
+  };
+
+  const formatCurrency = (value: number | string): string => {
+    const numValue = typeof value === "string" ? parseFloat(value) : value;
+    return new Intl.NumberFormat("ru-RU", {
+      style: "currency",
+      currency: "RUB",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(isNaN(numValue) ? 0 : numValue);
+  };
 </script>
 
 <template>
-  <div class="wrapper">
-    <h1>Шаг 4</h1>
-    <StepsNavigation :step="4" :show-back="true" :show-next="false">
-      <template #back>
-        <button class="btn" @click="handleBack">Назад</button>
-      </template>
-      <template #action>
-        <button class="btn" @click="saveData">Сохранить</button>
-      </template>
-      <template #next />
-    </StepsNavigation>
-  </div>
+  <StepsHeader
+    step-title="Расчет платы с Денежного оборота в Помещении"
+    :step-current="4"
+    :step-total="4"
+  />
+
+  <StepsMain>
+    <section :class="$style.section">
+      <div :class="$style.table">
+        <!-- Заголовок таблицы -->
+        <div :class="$style.tableRow">
+          <div
+            v-for="(col, index) in resulTableData?.header"
+            :key="index"
+            :class="[
+              $style.tableHeaderCell,
+              { [$style.spanColumns]: index === 0 },
+            ]"
+          >
+            {{ col.label }}
+          </div>
+        </div>
+
+        <div
+          v-for="(row, rowIndex) in resulTableData?.body"
+          :key="rowIndex"
+          :class="$style.tableRow"
+        >
+          <div :class="[$style.tableCell, $style.nameCell]">{{ row.name }}</div>
+
+          <template v-if="row.name === 'База сравнения за отчетный период'">
+            <div :class="[$style.tableCell, $style.sumCell]" :colspan="2">
+              <input
+                v-model="row.sum"
+                type="text"
+                :class="$style.baseInput"
+                @input="handleBaseInput($event, row)"
+                @blur="formatBaseValue(row)"
+              />
+            </div>
+          </template>
+          <template v-else-if="row.name === 'Процент с Денежного оборота, %'">
+            <div :class="[$style.tableCell, $style.sumCell]" :colspan="2">
+              {{
+                Number(row.sum) === Math.floor(row.sum)
+                  ? Math.floor(row.sum)
+                  : row.sum
+              }}%
+            </div>
+          </template>
+          <template v-else-if="row.name === 'Процент с Денежного оборота, руб'">
+            <div :class="$style.tableCell">
+              {{ row.with_nds ? formatCurrency(row.with_nds) : "" }}
+            </div>
+            <div :class="$style.tableCell">
+              {{ row.without_nds ? formatCurrency(row.without_nds) : "" }}
+            </div>
+          </template>
+          <template v-else-if="row.name === 'Плата с Денежного оборота, руб.'">
+            <div :class="$style.tableCell">
+              {{ formatCurrency(row.with_nds) }}
+            </div>
+            <div :class="$style.tableCell">
+              {{ formatCurrency(row.without_nds) }}
+            </div>
+          </template>
+          <template v-else>
+            <div :class="$style.tableCell">
+              {{ row.with_nds ? formatCurrency(parseFloat(row.with_nds)) : "" }}
+            </div>
+            <div :class="$style.tableCell">
+              {{
+                row.without_nds
+                  ? formatCurrency(parseFloat(row.without_nds))
+                  : ""
+              }}
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+  </StepsMain>
+
+  <StepsNavigation :step="4" :show-back="true" :show-next="false">
+    <template #back>
+      <UButton class="steps-nav-btn ghost" @click="handleBack">Назад</UButton>
+    </template>
+    <template #action>
+      <UButton class="steps-nav-btn ghost" @click="saveData"
+        >Сохранить
+      </UButton>
+    </template>
+    <template #next />
+  </StepsNavigation>
 </template>
 
-<style module lang="scss"></style>
+<style module lang="scss">
+  .section {
+    margin-bottom: rem(24);
+  }
+
+  .table {
+    display: grid;
+    grid-template-columns: 1fr 240px 240px;
+    max-width: rem(900);
+    border: 1px solid var(--a-borderLght);
+    font-size: rem(14);
+  }
+
+  .tableRow {
+    display: contents;
+  }
+
+  .tableHeaderCell {
+    display: flex;
+    justify-content: center;
+    padding: rem(12) rem(8);
+    background-color: var(--a-bgAccentExLight);
+    font-weight: bold;
+    text-align: center;
+
+    &:first-child {
+      background-color: transparent;
+    }
+  }
+
+  .tableCell {
+    padding: rem(12) rem(8);
+    background-color: var(--a-bgTable);
+    border-bottom: 1px solid var(--a-borderLght);
+    border-right: 1px solid var(--a-borderLght);
+    display: flex;
+    align-items: center;
+  }
+
+  .nameCell {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    background-color: var(--a-bgAccentExLight);
+  }
+
+  .sumCell {
+    display: flex;
+    justify-content: center;
+    grid-column: span 2;
+    text-align: center;
+  }
+
+  .baseInput {
+    width: 80%;
+    padding: rem(4) rem(8);
+    text-align: left;
+    font-size: rem(14);
+    border: 1px solid var(--a-borderMain);
+    border-radius: rem(4);
+    background-color: var(--a-mainBg);
+
+    &:focus {
+      outline: none;
+      border-color: var(--a-accentPrimary);
+      box-shadow: 0 0 0 2px rgba(var(--a-accentPrimaryRgb), 0.2);
+    }
+  }
+</style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import VueDatePicker from "@vuepic/vue-datepicker";
   import "@vuepic/vue-datepicker/dist/main.css";
+  import { formatDate } from "~/utils/date";
 
   const props = defineProps({
     block: {
@@ -36,17 +37,6 @@
     },
     { deep: true },
   );
-
-  const formatDate = (date: string | null): string => {
-    if (!date) return "--.--.----";
-    return new Date(date)
-      .toLocaleDateString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })
-      .replace(/\//g, ".");
-  };
 
   const updateLocalBlock = (field: string, value: unknown) => {
     localBlock.value = {
@@ -253,6 +243,7 @@
               : 'custom-datepicker-input'
           "
           placeholder="Выберите дату"
+          class="cashes-picker"
           :class="[
             {
               'error-data-field': invalidFields[`regDate-${index}`],
@@ -464,45 +455,47 @@
 
 <style lang="scss">
   .error-field {
-    border-color: var(--a-error) !important;
+    border-color: var(--a-error);
   }
 
-  .dp__input_wrap {
-    .dp__input {
-      width: rem(170) !important;
-      padding-left: rem(34) !important;
-      font-size: rem(12) !important;
-      background-color: var(--a-mainBg) !important;
-      border: 1px solid var(--a-borderAccentLight) !important;
-      border-radius: rem(4) !important;
+  .cashes-picker {
+    .dp__input_wrap {
+      .dp__input {
+        width: rem(170);
+        padding-left: rem(34);
+        font-size: rem(12);
+        background-color: var(--a-mainBg);
+        border: 1px solid var(--a-borderAccentLight);
+        border-radius: rem(4);
 
-      &:focus {
-        outline: none;
-        border-color: var(--a-primary) !important;
+        &:focus {
+          outline: none;
+          border-color: var(--a-primary);
+        }
+      }
+
+      svg {
+        padding: 0 rem(8);
       }
     }
 
-    svg {
-      padding: 0 rem(8) !important;
+    .dp__action_button {
+      background-color: var(--a-bgAccentLight);
+
+      &:hover {
+        background-color: var(--a-bgAccentDark);
+      }
     }
-  }
 
-  .dp__action_button {
-    background-color: var(--a-bgAccentLight) !important;
+    .dp__pointer {
+      padding: 0 rem(10);
+      font-size: rem(13);
+      font-weight: 600;
+      background-color: var(--a-mainBg);
 
-    &:hover {
-      background-color: var(--a-bgAccentDark) !important;
-    }
-  }
-
-  .dp__pointer {
-    padding: 0 rem(10) !important;
-    font-size: rem(13) !important;
-    font-weight: 600 !important;
-    background-color: var(--a-mainBg) !important;
-
-    &:hover {
-      color: var(--a-accentTextExDark) !important;
+      &:hover {
+        color: var(--a-accentTextExDark);
+      }
     }
   }
 </style>

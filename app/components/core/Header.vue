@@ -34,6 +34,10 @@
 
     try {
       isLoading.value = true;
+
+      const stepOneStore = useStepOneStore();
+      stepOneStore.reset();
+
       await authStore.logOut();
 
       if (import.meta.env.VITE_API_DATA_ONLY_MODE) {
@@ -142,8 +146,8 @@
       </div>
     </div>
 
-    <div v-if="userInfo" :class="$style.bottomRow">
-      {{ userInfo }}
+    <div :class="$style.bottomRow">
+      <p v-if="userInfo">{{ userInfo }}</p>
     </div>
 
     <div v-if="error" :class="$style.error">

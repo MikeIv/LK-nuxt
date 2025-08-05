@@ -41,9 +41,8 @@
   .navigation {
     display: flex;
     gap: rem(20);
-    align-items: center;
+    width: 100%;
+    height: rem(25);
     margin-top: auto;
-    font-size: rem(14);
-    font-weight: 600;
   }
 </style>
