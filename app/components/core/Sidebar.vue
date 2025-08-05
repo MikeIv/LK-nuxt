@@ -2,6 +2,7 @@
   import { useLocalStorage } from "@vueuse/core";
   import { useUserStore } from "~/stores/user";
   import { useApi } from "~/composables/useApi";
+  const { isActive } = useActiveRoute();
 
   const userStore = useUserStore();
   const { isLoading } = useApi();
@@ -73,8 +74,8 @@
             $style.item,
             $style.link,
             { '!max-w-[160px]': sidebarCollapsed },
+            { [$style.activeLink]: isActive(link.to) },
           ]"
-          :active-class="$style.activeLink"
         >
           <UIcon :name="link.icon" :class="$style.iconLink" />
           <span v-if="!sidebarCollapsed" :class="$style.title">
@@ -159,6 +160,10 @@
 
   .activeLink {
     background-color: var(--a-bgAccentExLight);
+    transition: background-color 0.3s ease;
+    &:hover {
+      background-color: var(--color-primary-200);
+    }
   }
 
   .title {

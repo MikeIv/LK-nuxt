@@ -24,73 +24,76 @@
 </script>
 
 <template>
-  <StepsHeader
-    main-title="Формирование отчета"
-    step-title="Период и общие данные"
-    :step-current="1"
-    :step-total="4"
-  />
-  <StepsMain>
-    <div :class="$style.wrapper">
-      <StepsContentTitle
-        text="Выберите период отчета о денежном обороте, а также укажите количество посетителей и чеков"
-      />
+  <div>
+    <StepsCoreHeader
+      main-title="Формирование отчета"
+      step-title="Период и общие данные"
+      :step-current="1"
+      :step-total="4"
+    />
+    <StepsCoreMain>
+      <div :class="$style.wrapper">
+        <StepsCoreContentTitle
+          text="Выберите период отчета о денежном обороте, а также укажите количество посетителей и чеков"
+        />
 
-      <div :class="$style.item">
-        <p :class="$style.title">Период</p>
-        <ModuleDatePicker v-model="stepOne.dateRange" />
-        <div v-if="stepOne.dateRange?.length === 2" :class="$style.dates">
-          Выбран период: {{ formatDate(stepOne.dateRange[0]) }} -
-          {{ formatDate(stepOne.dateRange[1]) }}
+        <div :class="$style.item">
+          <p :class="$style.title">Период</p>
+          <ModuleDatePicker v-model="stepOne.dateRange" />
+          <div v-if="stepOne.dateRange?.length === 2" :class="$style.dates">
+            Выбран период: {{ formatDate(stepOne.dateRange[0]) }} -
+            {{ formatDate(stepOne.dateRange[1]) }}
+          </div>
+        </div>
+
+        <div :class="$style.item">
+          <p :class="$style.title">Количество посетителей</p>
+          <input
+            v-model.number="stepOne.visitorsCount"
+            :class="$style.input"
+            type="number"
+            min="0"
+            placeholder="внесите данные"
+            @input="
+              stepOne.visitorsCount =
+                $event.target.value === ''
+                  ? null
+                  : Math.max(0, Number($event.target.value))
+            "
+          />
+        </div>
+
+        <div :class="$style.item">
+          <p :class="$style.title">Количество чеков</p>
+          <input
+            v-model.number="stepOne.checksCount"
+            :class="$style.input"
+            type="number"
+            min="0"
+            placeholder="внесите данные"
+            @input="
+              stepOne.checksCount =
+                $event.target.value === ''
+                  ? null
+                  : Math.max(0, Number($event.target.value))
+            "
+          />
         </div>
       </div>
+    </StepsCoreMain>
 
-      <div :class="$style.item">
-        <p :class="$style.title">Количество посетителей</p>
-        <input
-          v-model.number="stepOne.visitorsCount"
-          :class="$style.input"
-          type="number"
-          min="0"
-          placeholder="внесите данные"
-          @input="
-            stepOne.visitorsCount =
-              $event.target.value === ''
-                ? null
-                : Math.max(0, Number($event.target.value))
-          "
-        />
-      </div>
-
-      <div :class="$style.item">
-        <p :class="$style.title">Количество чеков</p>
-        <input
-          v-model.number="stepOne.checksCount"
-          :class="$style.input"
-          type="number"
-          min="0"
-          placeholder="внесите данные"
-          @input="
-            stepOne.checksCount =
-              $event.target.value === ''
-                ? null
-                : Math.max(0, Number($event.target.value))
-          "
-        />
-      </div>
-    </div>
-  </StepsMain>
-  <StepsNavigation :step="1" :show-back="false">
-    <template #next>
-      <UButton
-        class="steps-nav-btn solid"
-        :disabled="!isFormValid"
-        @click="validateAndNext"
-      >
-        Далее
-      </UButton>
-    </template>
-  </StepsNavigation>
+    <StepsCoreNavigation :step="1" :show-back="false">
+      <template #next>
+        <UButton
+          class="steps-nav-btn solid"
+          :disabled="!isFormValid"
+          @click="validateAndNext"
+        >
+          Далее
+        </UButton>
+      </template>
+    </StepsCoreNavigation>
+  </div>
 </template>
 
 <style module lang="scss">
