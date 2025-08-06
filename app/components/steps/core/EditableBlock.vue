@@ -1,10 +1,10 @@
 <script setup lang="ts">
   interface Header {
     label: string;
-    width?: string; // '100px', '1fr', 'auto' и т.д.
+    width?: string;
     minWidth?: string;
     maxWidth?: string;
-    flex?: string; // '1', '2' и т.д.
+    flex?: string;
     elements?: {
       label: string;
       width?: string;
@@ -116,9 +116,7 @@
     </div>
 
     <template v-else>
-      <!-- Слот для кастомного отображения данных -->
       <slot name="content" :items="modelValue">
-        <!-- Дефолтное отображение таблицы -->
         <div v-if="isTable" :class="block.table">
           <div :class="block.tableWrap">
             <!-- Заголовок таблицы -->
@@ -186,7 +184,6 @@
       </slot>
     </template>
 
-    <!-- Кнопки управления -->
     <StepsCoreBlockActions
       v-if="showActions"
       :add-button-text="addButtonText"

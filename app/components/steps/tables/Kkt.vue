@@ -1,8 +1,9 @@
 <script setup lang="ts">
-  import { useNumberInput } from "~/composables/useNumberInput";
   import { useSaveFile } from "~/composables/useSaveFile";
   import type { FileData, KktTableRow } from "~/types/tables";
   import { useFileHandling } from "~/composables/useFileHandling";
+  import { useKktInput } from "~/composables/tables/useKktInput";
+  import { useNumberFields } from "~/composables/tables/useNumberFields";
 
   interface KktTableProps {
     headers?: unknown[];
@@ -20,8 +21,6 @@
     loading: false,
     error: false,
   });
-
-  console.log("HEADER KktTable", props.headers);
 
   const emit = defineEmits<{
     (
@@ -49,6 +48,7 @@
   const state = reactive({
     editableRows: [...props.initialData] as KktTableRow[],
     kktErrors: {} as Record<number, string>,
+    numberErrors: {} as Record<number, string>,
     addedRowsCount: 0,
     addedRowsIndices: [] as number[],
     tableMessage: "",
@@ -57,15 +57,13 @@
   const {
     editableRows,
     kktErrors,
+    numberErrors,
     addedRowsCount,
     addedRowsIndices,
     tableMessage,
   } = toRefs(state);
 
-  const { handleNumberInput, handleNumberBlur } = useNumberInput(editableRows);
-  const { saveFile, loading: fileLoading, error: fileError } = useSaveFile();
-  console.log(saveFile);
-  console.log(fileError);
+  const { loading: fileLoading } = useSaveFile();
 
   if (editableRows.value.length === 0) {
     editableRows.value.push(createEmptyRow());
@@ -107,8 +105,8 @@
   const totalSumm = computed<number>(() => totalWithVAT.value);
 
   const calculateWithNds = (row: KktTableRow): number => {
-    const end = Number(row.end_meter_reading) || 0;
-    const start = Number(row.start_meter_reading) || 0;
+    const end = parseFloat(row.end_meter_reading.replace(",", ".")) || 0;
+    const start = parseFloat(row.start_meter_reading.replace(",", ".")) || 0;
     return end - start;
   };
 
@@ -135,60 +133,6 @@
       addedRowsCount.value--;
       tableMessage.value = "Касса удалена";
     }
-  };
-
-  const handleKktInput = (event: Event, index: number): void => {
-    const target = event.target as HTMLInputElement;
-    const cursorPosition = target.selectionStart;
-    let cleanedValue = target.value.replace(/\D/g, "");
-    cleanedValue = cleanedValue.slice(0, 16);
-
-    editableRows.value[index].registration_number = cleanedValue;
-    target.value = cleanedValue;
-
-    if (cursorPosition !== null) {
-      const newCursorPosition = Math.min(cursorPosition, cleanedValue.length);
-      target.setSelectionRange(newCursorPosition, newCursorPosition);
-    }
-
-    if (kktErrors.value[index]) {
-      kktErrors.value[index] = undefined;
-    }
-
-    if (cleanedValue.length === 16) {
-      validateKktNumber(index);
-    }
-  };
-
-  const checkForDuplicates = (index: number): boolean => {
-    const currentNumber = editableRows.value[index].registration_number;
-    if (!currentNumber) return false;
-
-    return editableRows.value.some(
-      (row, i) => row.registration_number === currentNumber && i !== index,
-    );
-  };
-
-  const validateKktNumber = (index: number): boolean => {
-    const kktNumber = editableRows.value[index].registration_number || "";
-
-    if (kktNumber === "") {
-      kktErrors.value[index] = undefined;
-      return false;
-    }
-
-    if (kktNumber.length !== 16) {
-      kktErrors.value[index] = "Номер ККТ должен содержать ровно 16 цифр";
-      return false;
-    }
-
-    if (checkForDuplicates(index)) {
-      kktErrors.value[index] = "Этот номер ККТ уже есть в отчете";
-      return false;
-    }
-
-    kktErrors.value[index] = undefined;
-    return true;
   };
 
   watch(
@@ -218,6 +162,23 @@
     { immediate: true },
   );
 
+  const {
+    handleKktInput,
+    validateKktNumber,
+    shouldShowError: shouldShowErrorKkt,
+  } = useKktInput(editableRows, kktErrors, emit);
+
+  const fieldValidations = {
+    start_meter_reading: { required: true, min: 0, allowZero: true },
+    end_meter_reading: { required: true, min: 0, allowZero: true },
+    amount_without_advance_nds: { required: true, min: 0 },
+    advance_without_certificates_with_nds: { required: true, min: 0 },
+    advance_without_certificates_nds: { required: true, min: 0 },
+  } as const;
+
+  const { handleNumberInput, handleNumberBlur, shouldShowError } =
+    useNumberFields(editableRows, numberErrors, fieldValidations);
+
   const { handleFileUploaded, handleFileRemoved } =
     useFileHandling<KktTableRow>({
       editableRows,
@@ -229,39 +190,6 @@
         file_ids: fileData.map((file) => Number(file.id)),
       }),
     });
-
-  const validateMeterReadings = (index: number): void => {
-    const startStr = editableRows.value[index].start_meter_reading;
-    const endStr = editableRows.value[index].end_meter_reading;
-
-    if (!startStr || !endStr) {
-      if (kktErrors.value[index]?.includes("Начальное значение")) {
-        kktErrors.value[index] = undefined;
-      }
-      return;
-    }
-
-    const start = parseFloat(startStr.replace(",", ".")) || 0;
-    const end = parseFloat(endStr.replace(",", ".")) || 0;
-
-    if (start > end) {
-      kktErrors.value[index] =
-        "Начальное значение не может быть больше конечного";
-    } else if (
-      kktErrors.value[index] ===
-      "Начальное значение не может быть больше конечного"
-    ) {
-      kktErrors.value[index] = undefined;
-    }
-  };
-
-  const handleNumberBlurWrapper = (field: keyof KktTableRow, index: number) => {
-    handleNumberBlur(field, index);
-
-    if (field === "start_meter_reading" || field === "end_meter_reading") {
-      validateMeterReadings(index);
-    }
-  };
 </script>
 
 <template>
@@ -292,20 +220,15 @@
           placeholder="Ровно 16 цифр"
           maxlength="16"
           inputmode="numeric"
-          pattern="[0-9]{16}"
           required
-          class="required-field"
-          :class="{ 'error-input': kktErrors[index] }"
+          :class="[
+            $style.inputField,
+            { [$style.errorInput]: shouldShowErrorKkt(index) },
+          ]"
           @input="handleKktInput($event, index)"
           @blur="validateKktNumber(index)"
         />
-        <div
-          v-if="
-            kktErrors[index] &&
-            (row?.registration_number || row?.registration_number === '')
-          "
-          class="body-row__error-message"
-        >
+        <div v-if="shouldShowErrorKkt(index)" :class="$style.errorMessage">
           {{ kktErrors[index] }}
         </div>
       </div>
@@ -313,50 +236,49 @@
         <input
           :value="row.start_meter_reading"
           placeholder="0,00"
-          pattern="^-?\d*\,?\d*$"
           required
-          class="required-field"
-          :class="{
-            'error-input':
-              kktErrors[index] ===
-              'Начальное значение не может быть больше конечного',
-          }"
+          :class="[
+            $style.inputField,
+            {
+              [$style.errorInput]: shouldShowError(
+                index,
+                'start_meter_reading',
+              ),
+              [$style.requiredField]:
+                fieldValidations['start_meter_reading']?.required,
+            },
+          ]"
           @input="handleNumberInput($event, 'start_meter_reading', index)"
-          @blur="handleNumberBlurWrapper('start_meter_reading', index)"
+          @blur="handleNumberBlur('start_meter_reading', index)"
         />
         <div
-          v-if="
-            kktErrors[index] ===
-            'Начальное значение не может быть больше конечного'
-          "
+          v-if="shouldShowError(index, 'start_meter_reading')"
           :class="$style.errorMessage"
         >
-          {{ kktErrors[index] }}
+          {{ numberErrors[index] }}
         </div>
       </div>
       <div class="cell body-cell">
         <input
           :value="row.end_meter_reading"
           placeholder="0,00"
-          pattern="^-?\d*\,?\d*$"
           required
-          class="required-field"
-          :class="{
-            'error-input':
-              kktErrors[index] ===
-              'Начальное значение не может быть больше конечного',
-          }"
+          :class="[
+            $style.inputField,
+            {
+              [$style.errorInput]: shouldShowError(index, 'end_meter_reading'),
+              [$style.requiredField]:
+                fieldValidations['end_meter_reading']?.required,
+            },
+          ]"
           @input="handleNumberInput($event, 'end_meter_reading', index)"
-          @blur="handleNumberBlurWrapper('end_meter_reading', index)"
+          @blur="handleNumberBlur('end_meter_reading', index)"
         />
         <div
-          v-if="
-            kktErrors[index] ===
-            'Начальное значение не может быть больше конечного'
-          "
+          v-if="shouldShowError(index, 'end_meter_reading')"
           :class="$style.errorMessage"
         >
-          {{ kktErrors[index] }}
+          {{ numberErrors[index] }}
         </div>
       </div>
       <div class="cell" :class="$style.cellRow">
@@ -368,8 +290,18 @@
             type="text"
             :value="row.amount_without_advance_nds"
             placeholder="0,00"
-            pattern="^-?\d*\,?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(
+                  index,
+                  'amount_without_advance_nds',
+                ),
+                [$style.requiredField]:
+                  fieldValidations['amount_without_advance_nds']?.required,
+              },
+            ]"
             @input="
               handleNumberInput($event, 'amount_without_advance_nds', index)
             "
@@ -383,8 +315,19 @@
             type="text"
             :value="row.advance_without_certificates_with_nds"
             placeholder="0,00"
-            pattern="^-?\d*\,?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(
+                  index,
+                  'advance_without_certificates_with_nds',
+                ),
+                [$style.requiredField]:
+                  fieldValidations['advance_without_certificates_with_nds']
+                    ?.required,
+              },
+            ]"
             @input="
               handleNumberInput(
                 $event,
@@ -402,8 +345,19 @@
             type="text"
             :value="row.advance_without_certificates_nds"
             placeholder="0,00"
-            pattern="^-?\d*\,?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(
+                  index,
+                  'advance_without_certificates_nds',
+                ),
+                [$style.requiredField]:
+                  fieldValidations['advance_without_certificates_nds']
+                    ?.required,
+              },
+            ]"
             @input="
               handleNumberInput(
                 $event,
@@ -445,6 +399,10 @@
 </template>
 
 <style module lang="scss">
+  .centre {
+    align-items: center;
+  }
+
   .cellRow {
     display: flex;
     align-items: center;
@@ -454,15 +412,6 @@
     border-right: 1px solid var(--a-borderLght);
     background-color: var(--a-bgTable);
     border-bottom: 1px solid var(--a-borderAccentLight);
-
-    & input {
-      width: 100%;
-      padding: 0.25rem 0.375rem;
-      border: 1px solid var(--a-borderAccentLight);
-      background-color: var(--a-mainBg);
-      border-radius: 0.25rem;
-      box-sizing: border-box;
-    }
   }
 
   .subCell {
@@ -472,8 +421,37 @@
     width: 50%;
   }
 
-  .centre {
-    align-items: center;
+  .bodyCell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.5rem;
+    background-color: var(--a-bgTable);
+  }
+
+  .inputField {
+    width: 100%;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--a-borderAccentLight);
+    background-color: var(--a-mainBg);
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: var(--a-primary);
+    }
+  }
+
+  .requiredField:not(:focus):placeholder-shown {
+    border-color: var(--a-borderError);
+  }
+
+  .errorInput {
+    border-color: var(--a-borderError);
+    //    box-shadow: 0 0 0 1px var(--a-borderError);
   }
 
   .errorMessage {

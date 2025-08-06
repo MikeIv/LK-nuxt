@@ -1,7 +1,7 @@
 <script setup lang="ts">
   const handleBack = () => {
     console.log("Back");
-    navigateTo("/record/2");
+    navigateTo("/record/3");
   };
   const saveData = () => {
     console.log("Save data");
@@ -69,13 +69,13 @@
 </script>
 
 <template>
-  <StepsHeader
+  <StepsCoreHeader
     step-title="Расчет платы с Денежного оборота в Помещении"
     :step-current="4"
     :step-total="4"
   />
 
-  <StepsMain>
+  <StepsCoreMain>
     <section :class="$style.section">
       <div :class="$style.table">
         <!-- Заголовок таблицы -->
@@ -150,9 +150,9 @@
         </div>
       </div>
     </section>
-  </StepsMain>
+  </StepsCoreMain>
 
-  <StepsNavigation :step="4" :show-back="true" :show-next="false">
+  <StepsCoreNavigation :step="4" :show-back="true" :show-next="false">
     <template #back>
       <UButton class="steps-nav-btn ghost" @click="handleBack">Назад</UButton>
     </template>
@@ -162,7 +162,7 @@
       </UButton>
     </template>
     <template #next />
-  </StepsNavigation>
+  </StepsCoreNavigation>
 </template>
 
 <style module lang="scss">

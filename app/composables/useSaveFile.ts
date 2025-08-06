@@ -32,7 +32,7 @@ export function useSaveFile() {
           Accept: "application/json",
         },
         body: formData,
-        credentials: "include", // Если нужны куки/авторизация
+        credentials: "include",
       });
 
       if (!response.ok) {
