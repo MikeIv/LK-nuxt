@@ -1,8 +1,12 @@
 <script setup lang="ts">
   import { useCashersStore } from "~/stores/cashers";
-  import { useKkt } from "~/composables/useKkt";
 
-  const { kktData, kktLoading, loadKktData } = useKkt();
+  const {
+    callApi: loadKktData,
+    data: kktData,
+    isLoading: kktLoading,
+  } = useApi<UserData>();
+
   console.log("loadKktData", loadKktData);
   console.log("kktData", kktData);
 
@@ -170,7 +174,7 @@
 
   onMounted(async () => {
     try {
-      await loadKktData();
+      await loadKktData("/tenants/kkts");
       const cashersStore = useCashersStore();
 
       cashersStore.loadFromApi(kktData.value);

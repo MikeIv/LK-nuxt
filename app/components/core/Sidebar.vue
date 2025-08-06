@@ -1,10 +1,10 @@
 <script setup lang="ts">
   import { useLocalStorage } from "@vueuse/core";
-  import { useUserStore } from "~/stores/user";
+  import { useUser } from "~/stores/user";
   import { useApi } from "~/composables/useApi";
   const { isActive } = useActiveRoute();
 
-  const userStore = useUserStore();
+  const userStore = useUser();
   const { isLoading } = useApi();
   const sidebarCollapsed = useLocalStorage("sidebarCollapsed", false);
 
@@ -25,13 +25,13 @@
     bgClass: userStore.user?.debt > 0 ? "hasDebt" : "noDebt",
   }));
 
-  onMounted(async () => {
-    try {
-      await userStore.getUser();
-    } catch (err) {
-      console.error("Failed to load user data:", err);
-    }
-  });
+  // onMounted(async () => {
+  //   try {
+  //     await userStore.getUser();
+  //   } catch (err) {
+  //     console.error("Failed to load user data:", err);
+  //   }
+  // });
 </script>
 
 <template>

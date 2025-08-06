@@ -1,5 +1,4 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  // Пропускаем middleware на серверной стороне
   if (import.meta.server) return;
 
   const authStore = useAuthStore();
@@ -36,4 +35,3 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
   }
 });
-

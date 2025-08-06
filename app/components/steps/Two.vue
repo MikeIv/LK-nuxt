@@ -8,7 +8,14 @@
     console.log("Save data");
   };
 
-  const { report, isLoading, error, fetchReport } = useReport();
+  // const { report, isLoading, error, fetchReport } = useReport();
+
+  const {
+    callApi: loadReport,
+    data: report,
+    isLoading,
+    error,
+  } = useApi<UserData>();
 
   const tableKkt = computed(() => report.value?.report?.kkts || {});
 
@@ -20,7 +27,7 @@
   };
 
   onMounted(async () => {
-    await fetchReport();
+    await loadReport("/tenants/reports/-1");
 
     console.log("reportKKT", report);
   });

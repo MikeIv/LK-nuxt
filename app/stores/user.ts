@@ -1,56 +1,26 @@
-interface User {
-  id: number;
-  tenant_name: string;
-  brand: string;
-  placeId: number | string;
-  docId: number | string;
-  docType: string;
-  docDate: string;
-  category: string;
-  kktId: number | string;
-  debt: number;
-  rentPercent: number;
-}
+import type { UserData } from "~/types/user";
 
-export const useUserStore = defineStore("user", () => {
-  const user = ref<User | null>(null);
-  const contractId = ref<number | null>(null);
-  const isLoading = ref(false);
+export const useUser = () => {
+  const { data: user, error, isLoading, callApi } = useApi<UserData>();
 
-  const { fetchUser, changeContract } = useUser();
-
-  const getUser = async () => {
-    isLoading.value = true;
-    try {
-      const response = await fetchUser();
-      console.log("RESPONSE", response);
-      user.value = response;
-      contractId.value = response.id;
-      return response;
-    } finally {
-      isLoading.value = false;
-    }
+  const fetchUser = async (): Promise<UserData | null> => {
+    return await callApi("/user/me");
   };
 
-  const changeUserContract = async (newContractId: number) => {
-    if (contractId.value === newContractId) return;
-
-    try {
-      await changeContract(newContractId);
-      contractId.value = newContractId;
-      await getUser();
-    } catch (err) {
-      console.error("Error changing contract:", err);
-      throw err;
-    }
+  const changeContract = async (
+    newContractId: number,
+  ): Promise<UserData | null> => {
+    return await callApi("/user/change-contract", {
+      method: "POST",
+      body: { contractId: newContractId },
+    });
   };
 
   return {
     user,
-    contractId,
+    error,
     isLoading,
-    getUser,
-    changeContract: changeUserContract,
+    fetchUser,
+    changeContract,
   };
-});
-
+};

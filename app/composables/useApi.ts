@@ -4,44 +4,69 @@ type ApiResponse<T> = {
   payload: T;
 };
 
-type ApiOptions = {
+type ApiOptions<T = unknown> = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  body?: unknown;
+  body?: T;
   headers?: Record<string, string>;
+  params?: Record<string, unknown>;
 };
 
 export const useApi = <T>() => {
-  const data: Ref<T | null> = ref(null);
-  const error = ref<Error | string | null>(null);
-  const isLoading: Ref<boolean> = ref(false);
+  const config = useRuntimeConfig();
+  const API_BASE_URL = config.public.apiBase;
+  const authStore = useAuthStore();
 
-  const fetchData = async (
-    url: string,
-    options: ApiOptions = { method: "GET" },
+  const data = ref<T | null>(null);
+  const error = ref<string | null>(null);
+  const isLoading = ref(false);
+
+  const callApi = async <D = unknown>(
+    endpoint: string,
+    options: ApiOptions<D> = { method: "GET" },
   ): Promise<T | null> => {
+    const fullUrl = endpoint.startsWith("http")
+      ? endpoint
+      : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+
     isLoading.value = true;
     error.value = null;
 
     try {
-      const response = await $fetch<ApiResponse<T>>(url, {
+      const headers = {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(authStore.token && { Authorization: `Bearer ${authStore.token}` }),
+        ...options.headers,
+      };
+
+      const response = await $fetch<ApiResponse<T>>(fullUrl, {
         method: options.method,
-        body: options.body,
+        body: options.method !== "GET" ? options.body : undefined,
+        params: options.method === "GET" ? options.params : undefined,
         credentials: "include",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          ...options.headers,
-        },
+        headers,
       });
 
       if (response.success) {
         data.value = response.payload;
         return response.payload;
       } else {
-        throw new Error(response.message || "Ошибка при выполнении запроса");
+        throw new Error(response.message || "Request failed");
       }
     } catch (err: unknown) {
-      error.value = (err as Error).message || "Ошибка при выполнении запроса";
+      error.value = err.message || "Request error";
+
+      // Auto-refresh token on 401
+      if (err.status === 401 && authStore.token) {
+        try {
+          await authStore.refreshToken();
+          return await callApi(endpoint, options);
+        } catch (refreshError) {
+          console.log(refreshError);
+          await authStore.logOut();
+        }
+      }
+
       return null;
     } finally {
       isLoading.value = false;
@@ -52,6 +77,6 @@ export const useApi = <T>() => {
     data,
     error,
     isLoading,
-    fetchData,
+    callApi,
   };
 };

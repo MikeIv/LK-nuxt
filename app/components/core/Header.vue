@@ -1,9 +1,9 @@
 <script setup lang="ts">
   import { useAuthStore } from "~/stores/auth";
-  import { useUserStore } from "~/stores/user";
+  import { useUser } from "~/stores/user";
   import { useApi } from "~/composables/useApi";
 
-  const userStore = useUserStore();
+  const userStore = useUser();
   const { isLoading, error } = useApi<unknown>();
 
   const authStore = useAuthStore();
@@ -109,7 +109,7 @@
   };
 
   onMounted(async () => {
-    await userStore.getUser();
+    await userStore.fetchUser();
 
     // Альтернативно: можно загружать напрямую через useApi
     // await fetchData('/api/user/me');

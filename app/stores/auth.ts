@@ -24,7 +24,7 @@ export const useAuthStore = defineStore("auth", () => {
   const setToken = (newToken: string) => {
     token.value = newToken;
     const cookie = useCookie("token", {
-      maxAge: 60 * 15, // 15 минут (как access token)
+      maxAge: 60 * 30, // 30 минут (как access token)
       secure: true,
       sameSite: "strict",
     });
@@ -140,4 +140,3 @@ export const useAuthStore = defineStore("auth", () => {
     refreshToken,
   };
 });
-

@@ -1,12 +1,12 @@
 // Получение данных по кассам KKT
 
 import { useApi } from "./useApi";
-import { useUserStore } from "~/stores/user";
+import { useUser } from "~/stores/user";
 import { useAuthStore } from "~/stores/auth";
 
 export const useKkt = () => {
   const config = useRuntimeConfig();
-  const userStore = useUserStore();
+  const userStore = useUser();
   const authStore = useAuthStore();
   const {
     data: kktData,
