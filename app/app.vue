@@ -32,13 +32,6 @@
 </script>
 
 <style>
-  @font-face {
-    font-family: "Roboto";
-    src: url("~/assets/fonts/Montserrat.woff2") format("woff2");
-    font-weight: 400;
-    font-display: swap;
-  }
-
   html {
     scroll-behavior: smooth;
   }
@@ -46,4 +39,3 @@
     font-family: "Montserrat", sans-serif;
   }
 </style>
-
