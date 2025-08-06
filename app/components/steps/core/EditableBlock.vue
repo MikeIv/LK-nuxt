@@ -240,7 +240,10 @@
   }
 
   .footer {
-    margin-top: rem(8);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: rem(16);
     border-bottom: 1px solid var(--a-borderAccentLight);
   }
 

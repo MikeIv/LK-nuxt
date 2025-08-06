@@ -58,10 +58,9 @@
     display: flex;
     align-items: center;
     gap: rem(24);
-    margin-top: rem(16);
     padding: rem(12);
     background-color: var(--color-primary-50);
-    border-radius: 4px;
+    border-radius: rem(4);
   }
 
   .label {

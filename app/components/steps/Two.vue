@@ -43,18 +43,8 @@
           <StepsTablesKkt
             :headers="tableKkt?.header"
             :initial-data="tableKkt?.body"
-            :added-rows-indices="addedKktRowsIndices"
             :loading="isLoading"
             :error="error"
-            @update:table-data="handleKktDataUpdate"
-            @update:total-summ="
-              (val) => handleKktTotalsUpdate(val, kktTotals.totalVAT)
-            "
-            @update:total-v-a-t="
-              (val) => handleKktTotalsUpdate(kktTotals.totalSumm, val)
-            "
-            @rows-added="handleKktRowsAdded"
-            @rows-removed="handleKktRowsRemoved"
           />
         </div>
       </section>
