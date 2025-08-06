@@ -8,12 +8,12 @@
 @tailwind components;
 @tailwind utilities; */
 
-// :root {
-//  --system-font:
-//    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-//    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
-//    "Noto Color Emoji", sans-serif;
-// }
+:root {
+  --system-font:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Noto Color Emoji", sans-serif;
+}
 
 :where(.dark, .dark *) {
   color-scheme: light !important;
