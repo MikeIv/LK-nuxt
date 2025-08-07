@@ -32,12 +32,17 @@ export const useApi = <T>() => {
     error.value = null;
 
     try {
-      const headers = {
+      // Базовые заголовки
+      const headers: Record<string, string> = {
         Accept: "application/json",
-        "Content-Type": "application/json",
         ...(authStore.token && { Authorization: `Bearer ${authStore.token}` }),
         ...options.headers,
       };
+
+      // Не устанавливаем Content-Type для FormData
+      if (!(options.body instanceof FormData)) {
+        headers["Content-Type"] = "application/json";
+      }
 
       const response = await $fetch<ApiResponse<T>>(fullUrl, {
         method: options.method,
@@ -54,15 +59,21 @@ export const useApi = <T>() => {
         throw new Error(response.message || "Request failed");
       }
     } catch (err: unknown) {
-      error.value = err.message || "Request error";
+      const errorMessage = err?.message || "Request error";
+      error.value = errorMessage;
+      console.error("API call error:", {
+        endpoint,
+        error: errorMessage,
+        status: err?.status,
+      });
 
       // Auto-refresh token on 401
-      if (err.status === 401 && authStore.token) {
+      if (err?.status === 401 && authStore.token) {
         try {
           await authStore.refreshToken();
           return await callApi(endpoint, options);
         } catch (refreshError) {
-          console.log(refreshError);
+          console.error("Token refresh failed:", refreshError);
           await authStore.logOut();
         }
       }

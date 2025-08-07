@@ -9,67 +9,68 @@ interface FileUploadResponse {
 }
 
 export function useSaveFile() {
-  const data = ref<FileUploadResponse | null>(null);
-  const loading = ref(false);
-  const error = ref<Error | null>(null);
+  const { callApi, isLoading } = useApi<FileUploadResponse>(); // Изменили тип здесь
 
-  async function saveFile(file: File) {
-    loading.value = true;
-    error.value = null;
+  async function saveFile(file: File): Promise<FileUploadResponse> {
+    console.debug("[saveFile] Starting file upload:", file.name);
+
+    if (!file || !(file instanceof File)) {
+      console.error("[saveFile] Invalid file provided");
+      throw new Error("Invalid file provided");
+    }
 
     const formData = new FormData();
     formData.append("file", file, file.name);
-
-    for (const [key, value] of formData.entries()) {
-      console.log("KEY", key);
-      console.log("value", value);
-    }
+    console.debug("[saveFile] FormData created");
 
     try {
-      const response = await customFetch("storage/upload", {
+      console.debug("[saveFile] Sending request to server...");
+      const response = await callApi("storage/upload", {
         method: "POST",
+        body: formData,
         headers: {
           Accept: "application/json",
         },
-        body: formData,
-        credentials: "include",
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to upload file");
+      console.debug("[saveFile] Server response:", response);
+
+      if (!response) {
+        console.error("[saveFile] No response received from server");
+        throw new Error("No response received from server");
       }
 
-      const responseData = await response.json();
-
-      if (!responseData.payload) {
-        throw new Error("Invalid server response format");
+      // Проверяем основные обязательные поля
+      if (!response.id || !response.url) {
+        console.error(
+          "[saveFile] Invalid server response - missing required fields",
+          response,
+        );
+        throw new Error("Invalid server response - missing required fields");
       }
 
-      const transformedData: FileUploadResponse = {
-        id: responseData.payload.id,
-        name: file.name,
-        url: responseData.payload.url,
-        mime_type: file.type,
-        size: file.size,
-        created_at: responseData.payload.created_at,
-        updated_at: responseData.payload.updated_at,
+      console.debug("[saveFile] Upload successful:", file.name);
+      return {
+        id: response.id,
+        name: response.name || file.name,
+        url: response.url,
+        mime_type: response.mime_type || file.type,
+        size: response.size || file.size,
+        created_at: response.created_at,
+        updated_at: response.updated_at,
       };
-
-      data.value = transformedData;
-      return transformedData;
-    } catch (err) {
-      error.value = err instanceof Error ? err : new Error("Upload failed");
-      throw error.value;
-    } finally {
-      loading.value = false;
+    } catch (error) {
+      console.error("[saveFile] Upload failed:", {
+        fileName: file.name,
+        error: error,
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+      });
+      throw new Error(`Failed to upload ${file.name}: ${error.message}`);
     }
   }
 
   return {
-    data,
-    loading,
-    error,
+    loading: isLoading,
     saveFile,
   };
 }

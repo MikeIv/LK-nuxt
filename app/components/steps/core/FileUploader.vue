@@ -1,7 +1,6 @@
 <script setup lang="ts">
-  import { computed, ref } from "vue";
-  import { useSaveFile } from "@/composables/useSaveFile";
-  import type { FileData } from "@/types/tables";
+  import { useSaveFile } from "~/composables/useSaveFile";
+  import type { FileData } from "~/types/tables";
 
   interface Props {
     files?: FileData[] | null;
@@ -27,10 +26,7 @@
   const emit = defineEmits<{
     (
       e: "files-uploaded",
-      payload: {
-        index: number;
-        filesData: FileData[];
-      },
+      payload: { index: number; filesData: FileData[] },
     ): void;
     (e: "file-removed", payload: { index: number; fileIndex: number }): void;
   }>();
@@ -42,39 +38,25 @@
   const isLoading = computed(() => props.loading || localLoading.value);
   const canAddMoreFiles = computed(() => {
     if (!props.multiple) return !props.files?.length;
-    if (!props.maxFiles) return true;
-    return (props.files?.length || 0) < props.maxFiles;
+    return props.maxFiles ? (props.files?.length || 0) < props.maxFiles : true;
   });
 
   const handleFileUpload = async (event: Event) => {
     const target = event.target as HTMLInputElement;
     const files = target.files;
-
-    if (!files || !files.length) return;
+    if (!files?.length) return;
 
     localLoading.value = true;
 
     try {
-      const uploadPromises = Array.from(files).map((file) => saveFile(file));
-      const responses = await Promise.all(uploadPromises);
+      const responses = await Promise.all(
+        Array.from(files).map((file) => saveFile(file)),
+      );
 
-      const validResponses = responses.filter(Boolean);
-      if (validResponses.length) {
-        const filesData = validResponses.map((response) => ({
-          id: response.id.toString(),
-          name: response.name,
-          url: response.url,
-          mime_type: response.mime_type,
-          size: response.size,
-          created_at: response.created_at,
-          updated_at: response.updated_at,
-        }));
-
-        emit("files-uploaded", {
-          index: props.index,
-          filesData,
-        });
-      }
+      emit("files-uploaded", {
+        index: props.index,
+        filesData: responses.map(toFileData),
+      });
     } catch (error) {
       console.error("File upload error:", error);
     } finally {
@@ -89,6 +71,16 @@
       fileIndex,
     });
   };
+
+  const toFileData = (response: unknown): FileData => ({
+    id: String(response.id),
+    name: response.name,
+    url: response.url,
+    mime_type: response.mime_type,
+    size: response.size,
+    created_at: response.created_at,
+    updated_at: response.updated_at,
+  });
 </script>
 
 <template>
