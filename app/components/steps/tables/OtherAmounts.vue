@@ -1,6 +1,4 @@
 <script setup lang="ts">
-  import { useSaveFile } from "~/composables/useSaveFile";
-  import { useFileHandling } from "~/composables/useFileHandling";
   import type { OtherAmountsTableRow } from "~/types/tables";
 
   const props = defineProps({
@@ -25,32 +23,36 @@
   const emit = defineEmits<{
     (
       e: "update:totalSumm" | "update:totalVAT" | "update:tableData",
-      value: number | OverSumTableRow[],
+      value: number | OtherAmountsTableRow[],
     ): void;
     (e: "rows-added", indices: number[]): void;
     (e: "rows-removed", index: number): void;
     (
       e: "files-uploaded",
-      payload: {
-        index: number;
-        filesData: FileData[];
-      },
+      payload: { index: number; filesData: FileData },
     ): void;
-    (
-      e: "file-removed",
-      payload: {
-        index: number;
-        fileIndex: number;
-      },
-    ): void;
+    (e: "file-removed", payload: { index: number }): void;
   }>();
 
+  // Реактивные данные
   const editableRows = ref<OtherAmountsTableRow[]>([]);
   const addedRowsIndices = ref<number[]>([]);
   const editingNameIndex = ref<number | null>(null);
   const nameInputRefs = ref<HTMLInputElement[]>([]);
   const tableMessage = ref("");
-  const { handleNumberInput, handleNumberBlur } = useNumberInput(editableRows);
+  const showRemoveButton = ref(false);
+  const invalidFields = ref<Record<number, string[]>>({});
+
+  // Composable
+  const fieldValidations = {
+    amount_with_nds: { required: true, min: 0 },
+    amount_nds: { required: true, min: 0 },
+  } as const;
+
+  const numberErrors = ref<Record<number, string>>({});
+
+  const { handleNumberInput, handleNumberBlur, shouldShowError } =
+    useNumberFields(editableRows, numberErrors, fieldValidations);
   const { loading: fileLoading } = useSaveFile();
   const { handleFileUploaded, handleFileRemoved } =
     useFileHandling<OtherAmountsTableRow>({
@@ -64,54 +66,52 @@
       }),
     });
 
-  const totalWithVAT = computed(() => {
-    return editableRows.value.reduce((sum, row) => {
-      return sum + (Number(row.amount_with_nds) || 0);
-    }, 0);
-  });
+  const validateRow = (index: number) => {
+    const errors: string[] = [];
+    const row = editableRows.value[index];
 
-  const totalVAT = computed(() => {
-    return editableRows.value.reduce((sum, row) => {
-      return sum + (Number(row.amount_nds) || 0);
-    }, 0);
-  });
+    if (!row.name?.trim()) errors.push("name");
 
-  const totalSumm = computed(() => totalWithVAT.value);
+    const amountWithNdsValid = !shouldShowError(index, "amount_with_nds");
+    const amountNdsValid = !shouldShowError(index, "amount_nds");
 
-  // Watchers
-  watch(
-    () => props.initialData,
-    (newData) => {
-      if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
-        editableRows.value = newData?.length
-          ? [...newData]
-          : [createEmptyRow()];
-        addedRowsIndices.value = [];
-      }
-    },
-    { immediate: true },
-  );
+    if (!amountWithNdsValid) errors.push("amount_with_nds");
+    if (!amountNdsValid) errors.push("amount_nds");
 
-  watch(
-    [totalSumm, totalVAT],
-    ([newTotalSumm, newTotalVAT], [oldTotalSumm, oldTotalVAT]) => {
-      if (newTotalSumm !== oldTotalSumm || newTotalVAT !== oldTotalVAT) {
-        emit("update:totalSumm", newTotalSumm);
-        emit("update:totalVAT", newTotalVAT);
-      }
-    },
-  );
+    invalidFields.value = {
+      ...invalidFields.value,
+      [index]: errors,
+    };
 
+    return errors.length === 0;
+  };
+
+  const { totalWithVAT, totalVAT } = useCashCalculations(editableRows);
+
+  // Методы
   const createEmptyRow = (): OtherAmountsTableRow => ({
     id: "",
     name: "",
-    amount_with_nds: "0",
-    amount_nds: "0",
+    amount_with_nds: "",
+    amount_nds: "",
     file_id: null,
+    file: undefined,
     isNew: true,
   });
 
-  const showRemoveButton = ref(false);
+  const normalizeRowData = (
+    row: OtherAmountsTableRow,
+  ): OtherAmountsTableRow => ({
+    ...createEmptyRow(),
+    ...row,
+    isNew: false,
+  });
+
+  const emitUpdate = () => {
+    emit("update:tableData", [...editableRows.value]);
+    emit("update:totalSumm", Number(totalWithVAT.value));
+    emit("update:totalVAT", Number(totalVAT.value));
+  };
 
   const addRow = async () => {
     const newRow = createEmptyRow();
@@ -119,58 +119,72 @@
     const newIndex = editableRows.value.length - 1;
     addedRowsIndices.value.push(newIndex);
     showRemoveButton.value = true;
+
     editingNameIndex.value = newIndex;
     await nextTick();
-    if (nameInputRefs.value[newIndex]) {
-      nameInputRefs.value[newIndex].focus();
-    }
+    nameInputRefs.value[newIndex]?.focus();
+
     tableMessage.value = "Основание добавлено";
     emitUpdate();
-    emit("rows-added");
+    emit("rows-added", [newIndex]);
   };
 
   const removeLastRow = () => {
-    console.log("addedRowsIndices", addedRowsIndices.value);
-    if (editableRows.value.length === 0) return;
-
-    // Удаляем последнюю строку
-    editableRows.value.pop();
-
-    if (editableRows.value.length === 0) {
+    if (
+      editableRows.value.length === 0 ||
+      addedRowsIndices.value.length === 0
+    ) {
       showRemoveButton.value = false;
-      editableRows.value = [];
-      addedRowsIndices.value = [];
-    } else {
-      const removedIndex = editableRows.value.length;
-      const indexInAdded = addedRowsIndices.value.indexOf(removedIndex);
-      if (indexInAdded !== -1) {
-        addedRowsIndices.value.splice(indexInAdded, 1);
-      }
-      addedRowsIndices.value = addedRowsIndices.value
-        .map((i) => (i > removedIndex ? i - 1 : i))
-        .filter((i) => i >= 0);
+      return;
     }
-    console.log("addedRowsIndices.value", addedRowsIndices.value);
+
+    const currentIndices = [...addedRowsIndices.value];
+    const lastAddedIndex = currentIndices[currentIndices.length - 1];
+
+    editableRows.value.splice(lastAddedIndex, 1);
+
+    const { [lastAddedIndex]: _, ...rest } = invalidFields.value;
+    invalidFields.value = rest;
+
+    addedRowsIndices.value = currentIndices
+      .filter((index) => index !== lastAddedIndex)
+      .map((index) => (index > lastAddedIndex ? index - 1 : index));
+
+    showRemoveButton.value = addedRowsIndices.value.length > 0;
     tableMessage.value = "Основание удалено";
     emitUpdate();
-    emit("rows-removed");
+    emit("rows-removed", lastAddedIndex);
   };
 
   const handleNameChange = (index: number, event: Event) => {
     const target = event.target as HTMLInputElement;
     editableRows.value[index].name = target.value;
-    emitUpdate();
+    validateRow(index);
   };
 
   const finishNameEditing = (index: number) => {
-    console.log(index);
     editingNameIndex.value = null;
-    emitUpdate();
+    validateRow(index);
   };
 
-  const emitUpdate = () => {
-    emit("update:tableData", [...editableRows.value]);
-  };
+  // Watchers
+  watch(
+    () => props.initialData,
+    (newData) => {
+      if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
+        editableRows.value = newData?.length
+          ? newData.map(normalizeRowData)
+          : [createEmptyRow()];
+        addedRowsIndices.value = [];
+        invalidFields.value = {};
+        showRemoveButton.value = false;
+      }
+    },
+    { immediate: true },
+  );
+
+  watch(totalWithVAT, () => emitUpdate());
+  watch(totalVAT, () => emitUpdate());
 </script>
 
 <template>
@@ -191,15 +205,22 @@
     @remove="removeLastRow"
   >
     <template #row="{ item: row, index }">
-      <div class="cell body-cell" :class="$style.centre">{{ index + 1 }}</div>
+      <div class="cell body-cell" :class="$style.centre">
+        {{ index + 1 }}
+      </div>
+
       <div class="cell body-cell">
-        <template v-if="editingNameIndex === index || row.isNew">
+        <template v-if="row.isNew || editingNameIndex === index">
           <input
             :ref="(el) => (nameInputRefs[index] = el as HTMLInputElement)"
             type="text"
             :value="row.name"
             placeholder="Введите название"
             class="name-input"
+            :class="[
+              'name-input',
+              { [$style.errorInput]: invalidFields[index]?.includes('name') },
+            ]"
             @input="handleNameChange(index, $event)"
             @blur="finishNameEditing(index)"
             @keyup.enter="finishNameEditing(index)"
@@ -211,14 +232,22 @@
           </span>
         </template>
       </div>
+
       <div class="cell" :class="$style.cellRow">
         <div>
           <input
             type="text"
             :value="row.amount_with_nds"
             placeholder="0,00"
-            pattern="^-?\d*\.?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(index, 'amount_with_nds'),
+                [$style.requiredField]:
+                  fieldValidations['amount_with_nds']?.required,
+              },
+            ]"
             @input="handleNumberInput($event, 'amount_with_nds', index)"
             @blur="handleNumberBlur('amount_with_nds', index)"
           />
@@ -228,13 +257,21 @@
             type="text"
             :value="row.amount_nds"
             placeholder="0,00"
-            pattern="^-?\d*\.?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(index, 'amount_nds'),
+                [$style.requiredField]:
+                  fieldValidations['amount_nds']?.required,
+              },
+            ]"
             @input="handleNumberInput($event, 'amount_nds', index)"
             @blur="handleNumberBlur('amount_nds', index)"
           />
         </div>
       </div>
+
       <div class="cell body-cell">
         <StepsCoreFileUploader
           :file="row.file"
@@ -242,15 +279,17 @@
           :index="index"
           prefix="other-amount-file"
           :loading="fileLoading"
-          @file-uploaded="handleFileUploaded"
-          @file-removed="handleFileRemoved"
+          @file-uploaded="
+            ({ fileData }) => handleFileUploaded({ index, filesData: fileData })
+          "
+          @file-removed="() => handleFileRemoved({ index })"
         />
       </div>
     </template>
 
     <template #footer>
       <StepsCoreTotalSummary
-        :total-summ="Number(totalSumm)"
+        :total-summ="Number(totalWithVAT)"
         :total-v-a-t="Number(totalVAT)"
       />
     </template>
@@ -261,6 +300,7 @@
   .cellRow {
     display: flex;
     justify-content: space-around;
+    align-items: center;
     gap: rem(8);
     font-size: rem(12);
     font-weight: bold;
@@ -268,6 +308,7 @@
     background-color: var(--a-bgTable);
     border-bottom: 1px solid var(--a-borderAccentLight);
   }
+
   .centre {
     align-items: center;
   }
@@ -275,12 +316,26 @@
   .editable {
     cursor: pointer;
   }
-</style>
 
-<style lang="scss">
-  .required {
-    border: 1px solid var(--a-errorText) !important;
-    border-radius: rem(4);
-    box-shadow: 0 0 0 1px var(--a-errorText);
+  .inputField {
+    width: 100%;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--a-borderAccentLight);
+    background-color: var(--a-mainBg);
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: var(--a-borderAccent);
+    }
+  }
+
+  .requiredField:not(:focus):placeholder-shown {
+    border-color: var(--a-borderError);
+  }
+
+  .errorInput {
+    border-color: var(--a-borderError);
   }
 </style>

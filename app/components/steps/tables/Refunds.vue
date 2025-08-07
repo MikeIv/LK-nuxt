@@ -1,7 +1,8 @@
 <script setup lang="ts">
-  import { useSaveFile } from "~/composables/useSaveFile";
   import type { RefundsTableRow } from "~/types/tables";
-  import { useFileHandling } from "~/composables/useFileHandling";
+  import { useKktInput } from "~/composables/tables/useKktInput";
+  import { useNumberFields } from "~/composables/tables/useNumberFields";
+  import { useCashCalculations } from "~/composables/tables/useCashCalculations";
 
   interface RefundsTableProps {
     headers?: unknown[];
@@ -20,159 +21,42 @@
   const emit = defineEmits<{
     (
       e: "update:totalSumm" | "update:totalVAT" | "update:tableData",
-      value: number | KktTableRow[],
+      value: number | RefundsTableRow[],
     ): void;
     (e: "rows-added", indices: number[]): void;
     (e: "rows-removed", index: number): void;
     (
       e: "files-uploaded",
-      payload: {
-        index: number;
-        filesData: FileData[];
-      },
+      payload: { index: number; filesData: FileData },
     ): void;
-    (
-      e: "file-removed",
-      payload: {
-        index: number;
-        fileIndex: number;
-      },
-    ): void;
+    (e: "file-removed", payload: { index: number }): void;
   }>();
 
-  const state = reactive({
-    editableRows: [...props.initialData],
-    kktErrors: {} as Record<number, string>,
-    addedRowsCount: 0,
-    addedRowsIndices: [] as number[],
-    tableMessage: "",
-  });
-
+  // Реактивные данные
+  const editableRows = ref<RefundsTableRow[]>([]);
+  const addedRowsIndices = ref<number[]>([]);
   const editingNameIndex = ref<number | null>(null);
   const nameInputRefs = ref<HTMLInputElement[]>([]);
-  const {
-    editableRows,
-    kktErrors,
-    addedRowsCount,
-    addedRowsIndices,
-    tableMessage,
-  } = toRefs(state);
+  const tableMessage = ref("");
+  const showRemoveButton = ref(false);
+  const invalidFields = ref<Record<number, string[]>>({});
+  const kktErrors = ref<Record<number, string>>({});
 
-  const { handleNumberInput, handleNumberBlur } = useNumberInput(editableRows);
+  // Composable
+  const fieldValidations = {
+    returns_goods_services_with_nds: { required: true, min: 0 },
+    returns_goods_services_nds: { required: true, min: 0 },
+    gift_certificates_sold_with_nds: { required: true, min: 0 },
+    gift_certificates_sold_nds: { required: true, min: 0 },
+  } as const;
+
+  const numberErrors = ref<Record<number, string>>({});
+
+  const { handleNumberInput, handleNumberBlur, shouldShowError } =
+    useNumberFields(editableRows, numberErrors, fieldValidations);
   const { loading: fileLoading } = useSaveFile();
-
-  if (editableRows.value.length === 0) {
-    editableRows.value.push(createEmptyRow());
-  }
-
-  function createEmptyRow(): RefundsTableRow {
-    return {
-      id: "",
-      name: "",
-      registration_number: "",
-      returns_goods_services_with_nds: "0",
-      returns_goods_services_nds: "0",
-      gift_certificates_sold_with_nds: "0",
-      gift_certificates_sold_nds: "0",
-      file_id: null,
-    };
-  }
-
-  const { handleKktInput, validateKktNumber } = useKktInput(
-    editableRows,
-    kktErrors,
-    emit,
-  );
-
-  const totalWithVAT = computed<number>(() => {
-    return editableRows.value.reduce((sum, row) => {
-      const xzWithNds = Number(row.returns_goods_services_with_nds) || 0;
-      const xzxzWithNds = Number(row.gift_certificates_sold_with_nds) || 0;
-      return sum + xzWithNds + xzxzWithNds;
-    }, 0);
-  });
-
-  const totalVAT = computed<number>(() => {
-    return editableRows.value.reduce((sum, row) => {
-      const xzNds = Number(row.returns_goods_services_nds) || 0;
-      const zxzxNds = Number(row.gift_certificates_sold_nds) || 0;
-      return sum + xzNds + zxzxNds;
-    }, 0);
-  });
-
-  const totalSumm = computed<number>(() => totalWithVAT.value);
-
-  const showRemoveButton = computed<boolean>(() => {
-    return addedRowsIndices.value.length > 0;
-  });
-
-  const addRow = (): void => {
-    const newRow = createEmptyRow();
-    editableRows.value.push(newRow);
-    addedRowsIndices.value.push(editableRows.value.length - 1);
-    addedRowsCount.value++;
-    tableMessage.value = "Добавлено основание";
-  };
-
-  const removeLastRow = (): void => {
-    if (editableRows.value.length > 1 && addedRowsIndices.value.length > 0) {
-      const lastAddedIndex = addedRowsIndices.value.pop();
-      if (lastAddedIndex !== undefined) {
-        editableRows.value.splice(lastAddedIndex, 1);
-        addedRowsIndices.value = addedRowsIndices.value.map((i) =>
-          i > lastAddedIndex ? i - 1 : i,
-        );
-      }
-      addedRowsCount.value--;
-      tableMessage.value = "Основание удалено";
-    }
-  };
-
-  const handleNameChange = (index: number, event: Event) => {
-    const target = event.target as HTMLInputElement;
-    editableRows.value[index].name = target.value;
-    emitUpdate();
-  };
-
-  const finishNameEditing = (index: number) => {
-    console.log(index);
-    editingNameIndex.value = null;
-    emitUpdate();
-  };
-
-  watch(
-    () => props.initialData,
-    (newData) => {
-      if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
-        editableRows.value = newData?.length
-          ? [...newData]
-          : [createEmptyRow()];
-        addedRowsIndices.value = [];
-      }
-    },
-    { immediate: true },
-  );
-
-  watch(
-    [totalSumm, totalVAT],
-    ([newTotalSumm, newTotalVAT], [oldTotalSumm, oldTotalVAT]) => {
-      if (newTotalSumm !== oldTotalSumm || newTotalVAT !== oldTotalVAT) {
-        emit("update:totalSumm", newTotalSumm);
-        emit("update:totalVAT", newTotalVAT);
-      }
-    },
-  );
-
-  watch(
-    editableRows,
-    (newRows) => {
-      emit("update:tableData", newRows);
-    },
-    { deep: true },
-  );
-
   const { handleFileUploaded, handleFileRemoved } =
-    useFileHandling<KktTableRow>({
+    useFileHandling<RefundsTableRow>({
       editableRows,
       emit,
       getFileId: (row) => row.file_id,
@@ -182,6 +66,139 @@
         file_id: fileData ? Number(fileData.id) : null,
       }),
     });
+
+  const {
+    handleKktInput,
+    validateKktNumber,
+    shouldShowError: shouldShowErrorKkt,
+  } = useKktInput(editableRows, kktErrors, emit);
+
+  const validateRow = (index: number) => {
+    const errors: string[] = [];
+    const row = editableRows.value[index];
+
+    if (!row.name?.trim()) errors.push("name");
+    if (shouldShowErrorKkt(index)) errors.push("registration_number");
+
+    const fieldsToValidate = [
+      "returns_goods_services_with_nds",
+      "returns_goods_services_nds",
+      "gift_certificates_sold_with_nds",
+      "gift_certificates_sold_nds",
+    ];
+
+    fieldsToValidate.forEach((field) => {
+      if (shouldShowError(index, field)) errors.push(field);
+    });
+
+    invalidFields.value = {
+      ...invalidFields.value,
+      [index]: errors,
+    };
+
+    return errors.length === 0;
+  };
+
+  const { totalWithVAT, totalVAT } = useCashCalculations(editableRows);
+
+  // Методы
+  const createEmptyRow = (): RefundsTableRow => ({
+    id: "",
+    name: "",
+    registration_number: "",
+    returns_goods_services_with_nds: "",
+    returns_goods_services_nds: "",
+    gift_certificates_sold_with_nds: "",
+    gift_certificates_sold_nds: "",
+    file_id: null,
+    file: undefined,
+    isNew: true,
+  });
+
+  const normalizeRowData = (row: RefundsTableRow): RefundsTableRow => ({
+    ...createEmptyRow(),
+    ...row,
+    isNew: false,
+  });
+
+  const emitUpdate = () => {
+    emit("update:tableData", [...editableRows.value]);
+    emit("update:totalSumm", Number(totalWithVAT.value));
+    emit("update:totalVAT", Number(totalVAT.value));
+  };
+
+  const addRow = async () => {
+    const newRow = createEmptyRow();
+    editableRows.value.push(newRow);
+    const newIndex = editableRows.value.length - 1;
+    addedRowsIndices.value.push(newIndex);
+    showRemoveButton.value = true;
+
+    editingNameIndex.value = newIndex;
+    await nextTick();
+    nameInputRefs.value[newIndex]?.focus();
+
+    tableMessage.value = "Основание добавлено";
+    emitUpdate();
+    emit("rows-added", [newIndex]);
+  };
+
+  const removeLastRow = () => {
+    if (
+      editableRows.value.length === 0 ||
+      addedRowsIndices.value.length === 0
+    ) {
+      showRemoveButton.value = false;
+      return;
+    }
+
+    const currentIndices = [...addedRowsIndices.value];
+    const lastAddedIndex = currentIndices[currentIndices.length - 1];
+
+    editableRows.value.splice(lastAddedIndex, 1);
+
+    const { [lastAddedIndex]: _, ...rest } = invalidFields.value;
+    invalidFields.value = rest;
+
+    addedRowsIndices.value = currentIndices
+      .filter((index) => index !== lastAddedIndex)
+      .map((index) => (index > lastAddedIndex ? index - 1 : index));
+
+    showRemoveButton.value = addedRowsIndices.value.length > 0;
+    tableMessage.value = "Основание удалено";
+    emitUpdate();
+    emit("rows-removed", lastAddedIndex);
+  };
+
+  const handleNameChange = (index: number, event: Event) => {
+    const target = event.target as HTMLInputElement;
+    editableRows.value[index].name = target.value;
+    validateRow(index);
+  };
+
+  const finishNameEditing = (index: number) => {
+    editingNameIndex.value = null;
+    validateRow(index);
+  };
+
+  // Watchers
+  watch(
+    () => props.initialData,
+    (newData) => {
+      if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
+        editableRows.value = newData?.length
+          ? newData.map(normalizeRowData)
+          : [createEmptyRow()];
+        addedRowsIndices.value = [];
+        invalidFields.value = {};
+        showRemoveButton.value = false;
+      }
+    },
+    { immediate: true },
+  );
+
+  watch(totalWithVAT, () => emitUpdate());
+  watch(totalVAT, () => emitUpdate());
 </script>
 
 <template>
@@ -204,14 +221,19 @@
       <div class="cell body-cell" :class="$style.centre">
         {{ index + 1 }}
       </div>
+
       <div class="cell body-cell">
-        <template v-if="editingNameIndex === index || row.isNew">
+        <template v-if="row.isNew || editingNameIndex === index">
           <input
             :ref="(el) => (nameInputRefs[index] = el as HTMLInputElement)"
             type="text"
             :value="row.name"
             placeholder="Введите название"
             class="name-input"
+            :class="[
+              'name-input',
+              { [$style.errorInput]: invalidFields[index]?.includes('name') },
+            ]"
             @input="handleNameChange(index, $event)"
             @blur="finishNameEditing(index)"
             @keyup.enter="finishNameEditing(index)"
@@ -223,6 +245,7 @@
           </span>
         </template>
       </div>
+
       <div class="cell body-cell">
         <input
           type="text"
@@ -230,26 +253,44 @@
           placeholder="Ровно 16 цифр"
           maxlength="16"
           inputmode="numeric"
-          pattern="[0-9]{16}"
-          :class="{ 'error-input': kktErrors[index] }"
+          required
+          :class="[
+            $style.inputField,
+            {
+              [$style.errorInput]: invalidFields[index]?.includes(
+                'registration_number',
+              ),
+            },
+          ]"
           @input="handleKktInput($event, index)"
           @blur="validateKktNumber(index)"
         />
         <div
-          v-if="kktErrors[index] && row?.registration_number"
-          class="body-row__error-message"
+          v-if="invalidFields[index]?.includes('registration_number')"
+          :class="$style.errorMessage"
         >
           {{ kktErrors[index] }}
         </div>
       </div>
+
       <div class="cell" :class="$style.cellRow">
         <div>
           <input
             type="text"
             :value="row.returns_goods_services_with_nds"
             placeholder="0,00"
-            pattern="^-?\d*\.?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(
+                  index,
+                  'returns_goods_services_with_nds',
+                ),
+                [$style.requiredField]:
+                  fieldValidations['returns_goods_services_with_nds']?.required,
+              },
+            ]"
             @input="
               handleNumberInput(
                 $event,
@@ -265,8 +306,18 @@
             type="text"
             :value="row.returns_goods_services_nds"
             placeholder="0,00"
-            pattern="^-?\d*\.?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(
+                  index,
+                  'returns_goods_services_nds',
+                ),
+                [$style.requiredField]:
+                  fieldValidations['returns_goods_services_nds']?.required,
+              },
+            ]"
             @input="
               handleNumberInput($event, 'returns_goods_services_nds', index)
             "
@@ -274,14 +325,25 @@
           />
         </div>
       </div>
+
       <div class="cell" :class="$style.cellRow">
         <div>
           <input
             type="text"
             :value="row.gift_certificates_sold_with_nds"
             placeholder="0,00"
-            pattern="^-?\d*\.?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(
+                  index,
+                  'gift_certificates_sold_with_nds',
+                ),
+                [$style.requiredField]:
+                  fieldValidations['gift_certificates_sold_with_nds']?.required,
+              },
+            ]"
             @input="
               handleNumberInput(
                 $event,
@@ -297,8 +359,18 @@
             type="text"
             :value="row.gift_certificates_sold_nds"
             placeholder="0,00"
-            pattern="^-?\d*\.?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(
+                  index,
+                  'gift_certificates_sold_nds',
+                ),
+                [$style.requiredField]:
+                  fieldValidations['gift_certificates_sold_nds']?.required,
+              },
+            ]"
             @input="
               handleNumberInput($event, 'gift_certificates_sold_nds', index)
             "
@@ -306,6 +378,7 @@
           />
         </div>
       </div>
+
       <div class="cell body-cell">
         <StepsCoreFileUploader
           :file="row.file"
@@ -313,15 +386,17 @@
           :index="index"
           prefix="refunds-file"
           :loading="fileLoading"
-          @file-uploaded="handleFileUploaded"
-          @file-removed="handleFileRemoved"
+          @file-uploaded="
+            ({ fileData }) => handleFileUploaded({ index, filesData: fileData })
+          "
+          @file-removed="() => handleFileRemoved({ index })"
         />
       </div>
     </template>
 
     <template #footer>
       <StepsCoreTotalSummary
-        :total-summ="Number(totalSumm)"
+        :total-summ="Number(totalWithVAT)"
         :total-v-a-t="Number(totalVAT)"
       />
     </template>
@@ -332,6 +407,7 @@
   .cellRow {
     display: flex;
     justify-content: space-around;
+    align-items: center;
     gap: rem(8);
     font-size: rem(12);
     font-weight: bold;
@@ -340,19 +416,39 @@
     border-bottom: 1px solid var(--a-borderAccentLight);
   }
 
+  .centre {
+    align-items: center;
+  }
+
   .editable {
     cursor: pointer;
   }
 
-  .centre {
-    align-items: center;
-  }
-</style>
+  .inputField {
+    width: 100%;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--a-borderAccentLight);
+    background-color: var(--a-mainBg);
+    border-radius: 0.25rem;
+    box-sizing: border-box;
 
-<style lang="scss">
-  .required {
-    border: 1px solid var(--a-errorText) !important;
-    border-radius: rem(4);
-    box-shadow: 0 0 0 1px var(--a-errorText);
+    &:focus {
+      outline: none;
+      border-color: var(--a-borderAccent);
+    }
+  }
+
+  .requiredField:not(:focus):placeholder-shown {
+    border-color: var(--a-borderError);
+  }
+
+  .errorInput {
+    border-color: var(--a-borderError);
+  }
+
+  .errorMessage {
+    color: var(--a-errorText);
+    font-size: rem(10);
+    margin-top: rem(4);
   }
 </style>
