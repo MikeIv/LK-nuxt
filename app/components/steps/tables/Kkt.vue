@@ -4,6 +4,7 @@
   import { useFileHandling } from "~/composables/useFileHandling";
   import { useKktInput } from "~/composables/tables/useKktInput";
   import { useNumberFields } from "~/composables/tables/useNumberFields";
+  import { useKktCalculations } from "~/composables/tables/useKktCalculations";
 
   interface KktTableProps {
     headers?: unknown[];
@@ -85,31 +86,6 @@
     };
   }
 
-  const totalWithVAT = computed<number>(() => {
-    return editableRows.value.reduce((sum, row) => {
-      const xzWithNds = calculateWithNds(row);
-      const xzxzWithNds =
-        Number(row.advance_without_certificates_with_nds) || 0;
-      return sum + xzWithNds + xzxzWithNds;
-    }, 0);
-  });
-
-  const totalVAT = computed<number>(() => {
-    return editableRows.value.reduce((sum, row) => {
-      const xzNds = Number(row.amount_without_advance_nds) || 0;
-      const zxzxNds = Number(row.advance_without_certificates_nds) || 0;
-      return sum + xzNds + zxzxNds;
-    }, 0);
-  });
-
-  const totalSumm = computed<number>(() => totalWithVAT.value);
-
-  const calculateWithNds = (row: KktTableRow): number => {
-    const end = parseFloat(row.end_meter_reading.replace(",", ".")) || 0;
-    const start = parseFloat(row.start_meter_reading.replace(",", ".")) || 0;
-    return end - start;
-  };
-
   const addRow = (): void => {
     const newRow = createEmptyRow();
     newRow.name = `Касса${editableRows.value.length + 1}`;
@@ -134,6 +110,9 @@
       tableMessage.value = "Касса удалена";
     }
   };
+
+  const { calculateWithNds, totalWithVAT, totalVAT } =
+    useKktCalculations(editableRows);
 
   watch(
     () => props.initialData,
@@ -391,7 +370,7 @@
 
     <template #footer>
       <StepsCoreTotalSummary
-        :total-summ="Number(totalSumm)"
+        :total-summ="Number(totalWithVAT)"
         :total-v-a-t="Number(totalVAT)"
       />
     </template>
