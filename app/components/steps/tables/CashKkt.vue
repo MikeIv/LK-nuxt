@@ -1,6 +1,4 @@
 <script setup lang="ts">
-  import { useSaveFile } from "~/composables/useSaveFile";
-  import { useFileHandling } from "~/composables/useFileHandling";
   import type { FileData, CashTableRow } from "~/types/tables";
 
   const props = defineProps({
@@ -25,34 +23,36 @@
   const emit = defineEmits<{
     (
       e: "update:totalSumm" | "update:totalVAT" | "update:tableData",
-      value: number | CashTableRow[],
+      value: number | KktTableRow[],
     ): void;
     (e: "rows-added", indices: number[]): void;
     (e: "rows-removed", index: number): void;
     (
       e: "files-uploaded",
-      payload: {
-        index: number;
-        filesData: FileData[];
-      },
+      payload: { index: number; filesData: FileData[] },
     ): void;
-    (
-      e: "file-removed",
-      payload: {
-        index: number;
-        fileIndex: number;
-      },
-    ): void;
+    (e: "file-removed", payload: { index: number; fileIndex: number }): void;
   }>();
 
+  // Реактивные данные
   const editableRows = ref<CashTableRow[]>([]);
   const addedRowsIndices = ref<number[]>([]);
   const editingNameIndex = ref<number | null>(null);
   const nameInputRefs = ref<HTMLInputElement[]>([]);
   const tableMessage = ref("");
   const showRemoveButton = ref(false);
+  const invalidFields = ref<Record<number, string[]>>({});
 
-  const { handleNumberInput, handleNumberBlur } = useNumberInput(editableRows);
+  // Composable
+  const fieldValidations = {
+    amount_with_nds: { required: true, min: 0 },
+    amount_nds: { required: true, min: 0 },
+  } as const;
+
+  const numberErrors = ref<Record<number, string>>({});
+
+  const { handleNumberInput, handleNumberBlur, shouldShowError } =
+    useNumberFields(editableRows, numberErrors, fieldValidations);
   const { loading: fileLoading } = useSaveFile();
   const { handleFileUploaded, handleFileRemoved } =
     useFileHandling<CashTableRow>({
@@ -66,64 +66,57 @@
       }),
     });
 
-  const totalWithVAT = computed(() => {
-    return editableRows.value.reduce((sum, row) => {
-      return sum + (Number(row.amount_with_nds) || 0);
-    }, 0);
-  });
+  const validateRow = (index: number) => {
+    const errors: string[] = [];
+    const row = editableRows.value[index];
 
-  const totalVAT = computed(() => {
-    return editableRows.value.reduce((sum, row) => {
-      return sum + (Number(row.amount_nds) || 0);
-    }, 0);
-  });
+    if (!row.name?.trim()) errors.push("name");
+    if (!row.settlement_account_number?.trim()) {
+      errors.push("settlement_account_number");
+    }
 
-  const totalSumm = computed(() => totalWithVAT.value);
+    const amountWithNdsValid = !shouldShowError(index, "amount_with_nds");
+    const amountNdsValid = !shouldShowError(index, "amount_nds");
 
-  const normalizeRowData = (row: CashTableRow): CashTableRow => ({
-    ...createEmptyRow(),
-    ...row,
-    settlement_account_number: row.settlement_account_number || "0",
-    amount_with_nds: row.amount_with_nds || "0",
-    amount_nds: row.amount_nds || "0",
-  });
+    if (!amountWithNdsValid) errors.push("amount_with_nds");
+    if (!amountNdsValid) errors.push("amount_nds");
 
-  watch(
-    () => props.initialData,
-    (newData) => {
-      if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
-        editableRows.value = newData?.length
-          ? newData.map((row) => ({
-              ...normalizeRowData(row),
-              isNew: false,
-            }))
-          : [createEmptyRow()];
-        addedRowsIndices.value = [];
-      }
-    },
-    { immediate: true },
-  );
+    invalidFields.value = {
+      ...invalidFields.value,
+      [index]: errors,
+    };
 
-  watch(
-    [totalSumm, totalVAT],
-    ([newTotalSumm, newTotalVAT], [oldTotalSumm, oldTotalVAT]) => {
-      if (newTotalSumm !== oldTotalSumm || newTotalVAT !== oldTotalVAT) {
-        emit("update:totalSumm", newTotalSumm);
-        emit("update:totalVAT", newTotalVAT);
-      }
-    },
-  );
+    return errors.length === 0;
+  };
 
+  const { handleSettlementInput, handleSettlementBlur } =
+    useSettlementInput<CashTableRow>(editableRows, validateRow);
+
+  const { totalWithVAT, totalVAT } = useCashCalculations(editableRows);
+
+  // Методы
   const createEmptyRow = (): CashTableRow => ({
     id: "",
     name: "",
-    settlement_account_number: "0",
-    amount_with_nds: "0",
-    amount_nds: "0",
+    settlement_account_number: "",
+    amount_with_nds: "",
+    amount_nds: "",
     file_ids: [],
     files: [],
     isNew: true,
   });
+
+  const normalizeRowData = (row: CashTableRow): CashTableRow => ({
+    ...createEmptyRow(),
+    ...row,
+    isNew: false,
+  });
+
+  const emitUpdate = () => {
+    emit("update:tableData", [...editableRows.value]);
+    emit("update:totalSumm", Number(totalWithVAT.value));
+    emit("update:totalVAT", Number(totalVAT.value));
+  };
 
   const addRow = async () => {
     const newRow = createEmptyRow();
@@ -138,7 +131,7 @@
 
     tableMessage.value = "Основание добавлено";
     emitUpdate();
-    emit("rows-added");
+    emit("rows-added", [newIndex]);
   };
 
   const removeLastRow = () => {
@@ -152,6 +145,9 @@
 
     editableRows.value.splice(lastAddedIndex, 1);
 
+    const { [lastAddedIndex]: _, ...rest } = invalidFields.value;
+    invalidFields.value = rest;
+
     addedRowsIndices.value = currentIndices
       .filter((index) => index !== lastAddedIndex)
       .map((index) => (index > lastAddedIndex ? index - 1 : index));
@@ -159,37 +155,37 @@
     showRemoveButton.value = addedRowsIndices.value.length > 0;
     tableMessage.value = "Основание удалено";
     emitUpdate();
-    emit("rows-removed");
+    emit("rows-removed", lastAddedIndex);
   };
 
   const handleNameChange = (index: number, event: Event) => {
     const target = event.target as HTMLInputElement;
     editableRows.value[index].name = target.value;
-    emitUpdate();
+    validateRow(index);
   };
 
   const finishNameEditing = (index: number) => {
-    console.log(index);
     editingNameIndex.value = null;
-    emitUpdate();
+    validateRow(index);
   };
 
-  const handleZxInput = (event: Event, index: number) => {
-    const target = event.target as HTMLInputElement;
-    editableRows.value[index].settlement_account_number = target.value;
-    emitUpdate();
-  };
+  // Watchers
+  watch(
+    () => props.initialData,
+    (newData) => {
+      if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
+        editableRows.value = newData?.length
+          ? newData.map(normalizeRowData)
+          : [createEmptyRow()];
+        addedRowsIndices.value = [];
+        invalidFields.value = {};
+      }
+    },
+    { immediate: true },
+  );
 
-  const handleZxBlur = (index: number) => {
-    if (editableRows.value[index].settlement_account_number === "") {
-      editableRows.value[index].settlement_account_number = "0";
-      emitUpdate();
-    }
-  };
-
-  const emitUpdate = () => {
-    emit("update:tableData", [...editableRows.value]);
-  };
+  watch(totalWithVAT, () => emitUpdate());
+  watch(totalVAT, () => emitUpdate());
 </script>
 
 <template>
@@ -221,6 +217,10 @@
             :value="row.name"
             placeholder="Введите название"
             class="name-input"
+            :class="[
+              'name-input',
+              { [$style.errorInput]: invalidFields[index]?.includes('name') },
+            ]"
             @input="handleNameChange(index, $event)"
             @blur="finishNameEditing(index)"
             @keyup.enter="finishNameEditing(index)"
@@ -234,11 +234,16 @@
       <div class="cell body-cell">
         <input
           type="text"
-          :value="row?.settlement_account_number"
+          :value="row.settlement_account_number || ''"
           placeholder="введите номер"
           required
-          @input="handleZxInput($event, index)"
-          @blur="handleZxBlur(index)"
+          :class="{
+            [$style.errorInput]: invalidFields[index]?.includes(
+              'settlement_account_number',
+            ),
+          }"
+          @input="handleSettlementInput($event, index)"
+          @blur="handleSettlementBlur(index)"
         />
       </div>
 
@@ -248,8 +253,15 @@
             type="text"
             :value="row.amount_with_nds"
             placeholder="0,00"
-            pattern="^-?\d*\.?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(index, 'amount_with_nds'),
+                [$style.requiredField]:
+                  fieldValidations['amount_with_nds']?.required,
+              },
+            ]"
             @input="handleNumberInput($event, 'amount_with_nds', index)"
             @blur="handleNumberBlur('amount_with_nds', index)"
           />
@@ -259,8 +271,15 @@
             type="text"
             :value="row.amount_nds"
             placeholder="0,00"
-            pattern="^-?\d*\.?\d*$"
             required
+            :class="[
+              $style.inputField,
+              {
+                [$style.errorInput]: shouldShowError(index, 'amount_nds'),
+                [$style.requiredField]:
+                  fieldValidations['amount_nds']?.required,
+              },
+            ]"
             @input="handleNumberInput($event, 'amount_nds', index)"
             @blur="handleNumberBlur('amount_nds', index)"
           />
@@ -288,7 +307,7 @@
 
     <template #footer>
       <StepsCoreTotalSummary
-        :total-summ="Number(totalSumm)"
+        :total-summ="Number(totalWithVAT)"
         :total-v-a-t="Number(totalVAT)"
       />
     </template>
@@ -308,19 +327,29 @@
     border-bottom: 1px solid var(--a-borderAccentLight);
   }
 
-  .editable {
-    cursor: pointer;
-  }
-
   .centre {
     align-items: center;
   }
-</style>
 
-<style lang="scss">
-  .required {
-    border: 1px solid var(--a-errorText) !important;
-    border-radius: rem(4);
-    box-shadow: 0 0 0 1px var(--a-errorText);
+  .inputField {
+    width: 100%;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--a-borderAccentLight);
+    background-color: var(--a-mainBg);
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: var(--a-borderAccent);
+    }
+  }
+
+  .requiredField:not(:focus):placeholder-shown {
+    border-color: var(--a-borderError);
+  }
+
+  .errorInput {
+    border-color: var(--a-borderError);
   }
 </style>

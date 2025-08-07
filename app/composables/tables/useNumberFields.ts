@@ -1,5 +1,3 @@
-import type { Ref } from "vue";
-
 type NumberField =
   | "start_meter_reading"
   | "end_meter_reading"

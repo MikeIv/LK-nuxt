@@ -19,6 +19,11 @@ export const useNumberInput = <T extends Record<string, unknown>>(
       "9",
       ".",
       ",",
+      "Backspace",
+      "Delete",
+      "ArrowLeft",
+      "ArrowRight",
+      "Tab",
     ];
     const isCtrlPressed = event.ctrlKey || event.metaKey;
 
@@ -45,27 +50,24 @@ export const useNumberInput = <T extends Record<string, unknown>>(
     const cursorPosition = target.selectionStart;
     let value = target.value;
 
-    value = value.replace(/[^\d.,]/g, "");
+    value = value.replace(/[^\d,.]/g, "");
 
     value = value.replace(/\./g, ",");
 
-    const commaIndex = value.indexOf(",");
-    if (commaIndex !== -1) {
-      value =
-        value.substring(0, commaIndex + 1) +
-        value.substring(commaIndex + 1).replace(/,/g, "");
+    const parts = value.split(",");
+    if (parts.length > 2) {
+      value = parts[0] + "," + parts.slice(1).join("");
     }
 
     if (value.startsWith(",")) value = "0" + value;
 
-    const parts = value.split(",");
     if (parts[1]?.length > 2) {
       value = parts[0] + "," + parts[1].slice(0, 2);
     }
 
-    editableRows.value[index][field] = (
-      value === "" ? "0" : value
-    ) as T[NumericField<T>];
+    editableRows.value[index][field] = (value || "0") as T[NumericField<T>];
+
+    // Обновляем значение в input
     target.value = value;
 
     nextTick(() => {
@@ -78,14 +80,18 @@ export const useNumberInput = <T extends Record<string, unknown>>(
 
   const handleNumberBlur = (field: NumericField<T>, index: number) => {
     const value = editableRows.value[index][field];
+
     if (typeof value === "string") {
-      // Заменяем запятую на точку для корректного парсинга числа
       const numericValue = parseFloat(value.replace(",", ".")) || 0;
 
       const formattedValue = numericValue.toFixed(2).replace(".", ",");
 
       editableRows.value[index][field] = formattedValue as T[NumericField<T>];
+
+      return true;
     }
+
+    return false;
   };
 
   return {
