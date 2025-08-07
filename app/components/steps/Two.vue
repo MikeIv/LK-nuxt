@@ -18,8 +18,15 @@
   } = useApi<UserData>();
 
   const tableKkt = computed(() => report.value?.report?.kkts || {});
-
-  console.log("tableKkt", tableKkt.value);
+  const tableCashKkt = computed(
+    () => report.value?.report?.cash_turnovers_without_kkt || {},
+  );
+  const tableNonCash = computed(
+    () => report.value?.report?.cash_turnovers_non_cash || {},
+  );
+  const tableOtherSum = computed(
+    () => report.value?.report?.cash_turnovers_other || {},
+  );
 
   const validateAndNext = () => {
     console.log("Next");
@@ -30,6 +37,8 @@
     await loadReport("/tenants/reports/-1");
 
     console.log("reportKKT", report);
+    console.log("tableKkt", tableKkt.value);
+    console.log("tableCashKkt", tableCashKkt.value);
   });
 </script>
 
@@ -50,6 +59,48 @@
           <StepsTablesKkt
             :headers="tableKkt?.header"
             :initial-data="tableKkt?.body"
+            :loading="isLoading"
+            :error="error"
+          />
+        </div>
+      </section>
+
+      <section :class="$style.wrapper">
+        <StepsCoreContentTitle
+          text="2.2 Денежный оборот, полученный на расчетные счета Арендатора без использования ККТ, установленных в Помещении"
+        />
+        <div class="table-container">
+          <StepsTablesCashKkt
+            :headers="tableCashKkt?.header"
+            :initial-data="tableCashKkt?.body"
+            :loading="isLoading"
+            :error="error"
+          />
+        </div>
+      </section>
+
+      <section :class="$style.wrapper">
+        <StepsCoreContentTitle
+          text="2.3 Денежный оборот, полученный в качестве неденежных форм расчетов"
+        />
+        <div class="table-container">
+          <StepsTablesNonCash
+            :headers="tableNonCash?.header"
+            :initial-data="tableNonCash?.body"
+            :loading="isLoading"
+            :error="error"
+          />
+        </div>
+      </section>
+
+      <section :class="$style.wrapper">
+        <StepsCoreContentTitle
+          text="2.4 Иные суммы, подлежащие включению в Денежный оборот в Помещении"
+        />
+        <div class="table-container">
+          <StepsTablesOtherSum
+            :headers="tableOtherSum?.header"
+            :initial-data="tableOtherSum?.body"
             :loading="isLoading"
             :error="error"
           />
