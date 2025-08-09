@@ -36,7 +36,9 @@
       isLoading.value = true;
 
       const stepOneStore = useStepOneStore();
+      const stepTwoStore = useTablesStore();
       stepOneStore.reset();
+      stepTwoStore.$reset();
 
       await authStore.logOut();
 

@@ -44,9 +44,25 @@ export const useTablesStore = defineStore("tables", {
   }),
 
   actions: {
-    /**
-     * Сохраняет данные таблицы ККТ
-     */
+    reset() {
+      this.kkt = {
+        rows: [],
+        totals: { withVAT: 0, VAT: 0 },
+      };
+      this.cashKkt = {
+        rows: [],
+        totals: { withVAT: 0, VAT: 0 },
+      };
+      this.nonCash = {
+        rows: [],
+        totals: { withVAT: 0, VAT: 0 },
+      };
+      this.otherSum = {
+        rows: [],
+        totals: { withVAT: 0, VAT: 0 },
+      };
+    },
+
     saveKktData(rows: KktTableRow[], totals: TableTotals) {
       this.kkt = {
         rows: [...rows],
@@ -54,9 +70,6 @@ export const useTablesStore = defineStore("tables", {
       };
     },
 
-    /**
-     * Сохраняет данные таблицы CashKkt
-     */
     saveCashKktData(rows: CashTableRow[], totals: TableTotals) {
       this.cashKkt = {
         rows: [...rows],
@@ -64,9 +77,6 @@ export const useTablesStore = defineStore("tables", {
       };
     },
 
-    /**
-     * Сохраняет данные таблицы NonCash
-     */
     saveNonCashData(rows: NonCashTableRow[], totals: TableTotals) {
       this.nonCash = {
         rows: [...rows],
@@ -74,9 +84,6 @@ export const useTablesStore = defineStore("tables", {
       };
     },
 
-    /**
-     * Сохраняет данные таблицы OtherSum
-     */
     saveOtherSumData(rows: OtherSumTableRow[], totals: TableTotals) {
       this.otherSum = {
         rows: [...rows],
@@ -84,9 +91,6 @@ export const useTablesStore = defineStore("tables", {
       };
     },
 
-    /**
-     * Сохраняет данные всех таблиц сразу
-     */
     saveAllTables(data: {
       kkt: { rows: KktTableRow[]; totals: TableTotals };
       cashKkt: { rows: CashTableRow[]; totals: TableTotals };
@@ -99,9 +103,6 @@ export const useTablesStore = defineStore("tables", {
       this.saveOtherSumData(data.otherSum.rows, data.otherSum.totals);
     },
 
-    /**
-     * Получает данные таблицы ККТ
-     */
     getKktData(): TableData<KktTableRow> {
       return {
         rows: [...this.kkt.rows],
@@ -109,9 +110,6 @@ export const useTablesStore = defineStore("tables", {
       };
     },
 
-    /**
-     * Получает данные таблицы CashKkt
-     */
     getCashKktData(): TableData<CashTableRow> {
       return {
         rows: [...this.cashKkt.rows],
@@ -119,9 +117,6 @@ export const useTablesStore = defineStore("tables", {
       };
     },
 
-    /**
-     * Получает данные таблицы NonCash
-     */
     getNonCashData(): TableData<NonCashTableRow> {
       return {
         rows: [...this.nonCash.rows],
@@ -129,9 +124,6 @@ export const useTablesStore = defineStore("tables", {
       };
     },
 
-    /**
-     * Получает данные таблицы OtherSum
-     */
     getOtherSumData(): TableData<OtherSumTableRow> {
       return {
         rows: [...this.otherSum.rows],
@@ -139,9 +131,6 @@ export const useTablesStore = defineStore("tables", {
       };
     },
 
-    /**
-     * Получает данные всех таблиц
-     */
     getAllTablesData() {
       return {
         kkt: this.getKktData(),

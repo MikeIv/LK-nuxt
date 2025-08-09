@@ -1,13 +1,7 @@
 <script setup lang="ts">
-  import { useTablesStore } from "~/stores/stepTwo";
-
   const handleBack = () => {
     console.log("Back");
     navigateTo("/record/1");
-  };
-
-  const saveData = () => {
-    console.log("Save data");
   };
 
   const {
@@ -28,12 +22,104 @@
     () => report.value?.report?.cash_turnovers_other || {},
   );
 
+  const stepOneStore = useStepOneStore();
   const tablesStore = useTablesStore();
 
   const kktTableRef = ref();
   const cashKktTableRef = ref();
   const nonCashTableRef = ref();
   const otherSumTableRef = ref();
+
+  const isSaving = ref(false);
+
+  const saveData = async () => {
+    isSaving.value = true;
+    try {
+      // Получаем данные из всех таблиц
+      const tablesData = {
+        kkt: kktTableRef.value?.getTableData() || {
+          rows: [],
+          totals: { withVAT: 0, VAT: 0 },
+        },
+        cashKkt: cashKktTableRef.value?.getTableData() || {
+          rows: [],
+          totals: { withVAT: 0, VAT: 0 },
+        },
+        nonCash: nonCashTableRef.value?.getTableData() || {
+          rows: [],
+          totals: { withVAT: 0, VAT: 0 },
+        },
+        otherSum: otherSumTableRef.value?.getTableData() || {
+          rows: [],
+          totals: { withVAT: 0, VAT: 0 },
+        },
+      };
+
+      // Подготавливаем данные для отправки
+      const reportData = {
+        status: "Draft",
+        report: {
+          visitors_count: stepOneStore.visitorsCount,
+          receipts_count: stepOneStore.checksCount,
+          comparison_base: 0, // Заполните при необходимости
+          rent_percentage: 0, // Заполните при необходимости
+          kkts: tablesData.kkt.rows.map((row) => ({
+            name: row.name,
+            registration_number: row.registration_number,
+            start_meter_reading: Number(row.start_meter_reading) || 0,
+            end_meter_reading: Number(row.end_meter_reading) || 0,
+            amount_without_advance_with_nds:
+              Number(row.amount_without_advance_with_nds) || 0,
+            amount_without_advance_nds:
+              Number(row.amount_without_advance_nds) || 0,
+            advance_without_certificates_with_nds:
+              Number(row.advance_without_certificates_with_nds) || 0,
+            advance_without_certificates_nds:
+              Number(row.advance_without_certificates_nds) || 0,
+            file_ids: row.file_ids || [],
+          })),
+          cash_turnovers_without_kkt: tablesData.cashKkt.rows.map((row) => ({
+            name: row.name,
+            settlement_account_number: row.settlement_account_number,
+            amount_with_nds: Number(row.amount_with_nds) || 0,
+            amount_nds: Number(row.amount_nds) || 0,
+            file_ids: row.file_ids || [],
+          })),
+          cash_turnovers_non_cash: tablesData.nonCash.rows.map((row) => ({
+            name: row.name,
+            amount_with_nds: Number(row.amount_with_nds) || 0,
+            amount_nds: Number(row.amount_nds) || 0,
+            file_ids: row.file_ids || [],
+          })),
+          cash_turnovers_other: tablesData.otherSum.rows.map((row) => ({
+            name: row.name,
+            amount_with_nds: Number(row.amount_with_nds) || 0,
+            amount_nds: Number(row.amount_nds) || 0,
+            file_ids: row.file_ids || [],
+          })),
+          period: {
+            start: new Date(stepOneStore.dateRange[0]).toISOString(),
+            end: new Date(stepOneStore.dateRange[1]).toISOString(),
+          },
+        },
+      };
+
+      // Отправляем данные на сервер
+      const response = await loadReport("/tenants/reports", {
+        method: "POST",
+        body: reportData,
+      });
+
+      if (response) {
+        console.log("Черновик успешно сохранён");
+        isSaving.value = true;
+        // Можно добавить уведомление об успешном сохранении
+      }
+    } catch (error) {
+      console.error("Ошибка при сохранении черновика:", error);
+      // Можно добавить уведомление об ошибке
+    }
+  };
 
   const validateAndNext = () => {
     const tablesData = {
@@ -196,8 +282,11 @@
         <UButton class="steps-nav-btn ghost" @click="handleBack">Назад</UButton>
       </template>
       <template #action>
-        <UButton class="steps-nav-btn ghost" @click="saveData"
-          >Сохранить
+        <UButton
+          class="steps-nav-btn ghost"
+          :loading="isSaving"
+          @click="saveData"
+          >Сохранить как черновик
         </UButton>
       </template>
       <template #next>
