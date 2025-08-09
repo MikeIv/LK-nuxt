@@ -169,6 +169,23 @@
         file_ids: fileData.map((file) => Number(file.id)),
       }),
     });
+
+  const getTableData = () => ({
+    rows: [...editableRows.value],
+    totals: {
+      withVAT: Number(totalWithVAT.value),
+      VAT: Number(totalVAT.value),
+    },
+  });
+
+  const setData = (newData: KktTableRow[]) => {
+    editableRows.value = [...newData];
+  };
+
+  defineExpose({
+    getTableData,
+    setData,
+  });
 </script>
 
 <template>

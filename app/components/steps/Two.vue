@@ -1,4 +1,6 @@
 <script setup lang="ts">
+  import { useTablesStore } from "~/stores/stepTwo";
+
   const handleBack = () => {
     console.log("Back");
     navigateTo("/record/1");
@@ -7,8 +9,6 @@
   const saveData = () => {
     console.log("Save data");
   };
-
-  // const { report, isLoading, error, fetchReport } = useReport();
 
   const {
     callApi: loadReport,
@@ -28,17 +28,96 @@
     () => report.value?.report?.cash_turnovers_other || {},
   );
 
+  const tablesStore = useTablesStore();
+
+  const kktTableRef = ref();
+  const cashKktTableRef = ref();
+  const nonCashTableRef = ref();
+  const otherSumTableRef = ref();
+
   const validateAndNext = () => {
-    console.log("Next");
-    navigateTo("/record/3");
+    const tablesData = {
+      kkt: kktTableRef.value?.getTableData() || {
+        rows: [],
+        totals: { withVAT: 0, VAT: 0 },
+      },
+      cashKkt: cashKktTableRef.value?.getTableData() || {
+        rows: [],
+        totals: { withVAT: 0, VAT: 0 },
+      },
+      nonCash: nonCashTableRef.value?.getTableData() || {
+        rows: [],
+        totals: { withVAT: 0, VAT: 0 },
+      },
+      otherSum: otherSumTableRef.value?.getTableData() || {
+        rows: [],
+        totals: { withVAT: 0, VAT: 0 },
+      },
+    };
+
+    const validateTablesData = (data: {
+      kkt: { rows: unknown[]; totals: { withVAT: number; VAT: number } };
+      cashKkt: { rows: unknown[]; totals: { withVAT: number; VAT: number } };
+      nonCash: { rows: unknown[]; totals: { withVAT: number; VAT: number } };
+      otherSum: { rows: unknown[]; totals: { withVAT: number; VAT: number } };
+    }): boolean => {
+      // 1. Проверка на пустые таблицы (если требуется)
+      if (data.kkt.rows.length === 0) {
+        console.warn("Таблица ККТ пуста");
+        return false;
+      }
+
+      if (isNaN(data.kkt.totals.withVAT) || data.kkt.totals.withVAT < 0) {
+        console.warn("Некорректная сумма в таблице ККТ");
+        return false;
+      }
+
+      // 3. Добавьте другие проверки по необходимости...
+      // Например:
+      // - Проверка обязательных полей в строках
+      // - Проверка формата данных
+      // - Сравнение итоговых сумм
+
+      return true;
+    };
+
+    if (!validateTablesData(tablesData)) {
+      console.error("Ошибка: Данные таблиц невалидны");
+      // Можно добавить UI-уведомление (например, через toast)
+      return;
+    }
+
+    try {
+      tablesStore.saveAllTables(tablesData);
+      console.log("Данные успешно сохранены:", tablesData);
+      navigateTo("/record/3");
+    } catch (error) {
+      console.error("Ошибка сохранения:", error);
+      // Обработка ошибки (например, показать сообщение пользователю)
+    }
   };
 
   onMounted(async () => {
-    await loadReport("/tenants/reports/-1");
+    try {
+      await loadReport("/tenants/reports/-1");
 
-    console.log("reportKKT", report);
-    console.log("tableKkt", tableKkt.value);
-    console.log("tableCashKkt", tableCashKkt.value);
+      await nextTick();
+
+      if (tablesStore.kkt.rows.length > 0) {
+        kktTableRef.value?.setData?.(tablesStore.kkt.rows);
+      }
+      if (tablesStore.cashKkt.rows.length > 0) {
+        cashKktTableRef.value?.setData?.(tablesStore.cashKkt.rows);
+      }
+      if (tablesStore.nonCash.rows.length > 0) {
+        nonCashTableRef.value?.setData?.(tablesStore.nonCash.rows);
+      }
+      if (tablesStore.otherSum.rows.length > 0) {
+        otherSumTableRef.value?.setData?.(tablesStore.otherSum.rows);
+      }
+    } catch (error) {
+      console.error("Ошибка при загрузке данных:", error);
+    }
   });
 </script>
 
@@ -57,6 +136,7 @@
         />
         <div class="table-container">
           <StepsTablesKkt
+            ref="kktTableRef"
             :headers="tableKkt?.header"
             :initial-data="tableKkt?.body"
             :loading="isLoading"
@@ -71,6 +151,7 @@
         />
         <div class="table-container">
           <StepsTablesCashKkt
+            ref="cashKktTableRef"
             :headers="tableCashKkt?.header"
             :initial-data="tableCashKkt?.body"
             :loading="isLoading"
@@ -85,6 +166,7 @@
         />
         <div class="table-container">
           <StepsTablesNonCash
+            ref="nonCashTableRef"
             :headers="tableNonCash?.header"
             :initial-data="tableNonCash?.body"
             :loading="isLoading"
@@ -99,6 +181,7 @@
         />
         <div class="table-container">
           <StepsTablesOtherSum
+            ref="otherSumTableRef"
             :headers="tableOtherSum?.header"
             :initial-data="tableOtherSum?.body"
             :loading="isLoading"

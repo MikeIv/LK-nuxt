@@ -183,6 +183,23 @@
 
   watch(totalWithVAT, () => emitUpdate());
   watch(totalVAT, () => emitUpdate());
+
+  const getTableData = () => ({
+    rows: [...editableRows.value],
+    totals: {
+      withVAT: Number(totalWithVAT.value),
+      VAT: Number(totalVAT.value),
+    },
+  });
+
+  const setData = (newData: KktTableRow[]) => {
+    editableRows.value = [...newData];
+  };
+
+  defineExpose({
+    getTableData,
+    setData,
+  });
 </script>
 
 <template>
