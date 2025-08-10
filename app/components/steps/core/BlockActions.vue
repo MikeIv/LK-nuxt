@@ -59,7 +59,7 @@
 </script>
 
 <template>
-  <div :class="$style.row">
+  <div v-if="addButtonText" :class="$style.row">
     <div :class="$style.actions">
       <button :class="[$style.button, $style.accentBtn]" @click="emit('add')">
         {{ addButtonText }}

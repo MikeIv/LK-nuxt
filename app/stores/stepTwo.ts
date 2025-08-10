@@ -43,6 +43,30 @@ export const useTablesStore = defineStore("tables", {
     },
   }),
 
+  getters: {
+    totalWithVAT(): number {
+      return (
+        this.kkt.totals.withVAT +
+        this.cashKkt.totals.withVAT +
+        this.nonCash.totals.withVAT +
+        this.otherSum.totals.withVAT
+      );
+    },
+
+    totalVAT(): number {
+      return (
+        this.kkt.totals.VAT +
+        this.cashKkt.totals.VAT +
+        this.nonCash.totals.VAT +
+        this.otherSum.totals.VAT
+      );
+    },
+
+    totalWithoutVAT(): number {
+      return this.totalWithVAT - this.totalVAT;
+    },
+  },
+
   actions: {
     reset() {
       this.kkt = {

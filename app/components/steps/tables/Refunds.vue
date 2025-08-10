@@ -210,8 +210,6 @@
     :loading="loading"
     :error="error"
     :message="tableMessage"
-    add-button-text="Добавить основание"
-    remove-button-text="Удалить основание"
     :show-remove-button="showRemoveButton"
     is-table
     @add="addRow"

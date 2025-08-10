@@ -3,11 +3,26 @@
     console.log("Back");
     navigateTo("/record/3");
   };
-  const saveData = () => {
-    console.log("Save data");
-  };
 
-  const hasChanges = ref(false);
+  const {
+    handleBaseInput,
+    formatBaseValue,
+    formatCurrency,
+    savingReport,
+    isSaving,
+    baseComparisonValue,
+    rentPercentage,
+    percentageWithVAT,
+    percentageWithoutVAT,
+    paymentWithVAT,
+    paymentWithoutVAT,
+    tablesStore,
+    loadReport,
+    isLoading,
+  } = useReportCalculation();
+
+  console.log("loadReport", loadReport);
+  console.log("isLoading", isLoading);
 
   const resulTableData = ref({
     header: [
@@ -18,17 +33,17 @@
     body: [
       {
         name: "Итого Денежный оборот в Помещении",
-        with_nds: "0",
-        without_nds: "0",
+        with_nds: tablesStore?.totalWithVAT || "0",
+        without_nds: tablesStore?.totalWithoutVAT || "0",
       },
       {
         name: "Процент с Денежного оборота, %",
-        sum: "0",
+        sum: rentPercentage || "0",
       },
       {
         name: "Процент с Денежного оборота, руб",
-        with_nds: 0,
-        without_nds: 0,
+        with_nds: percentageWithVAT,
+        without_nds: percentageWithoutVAT,
       },
       {
         name: "База сравнения за отчетный период",
@@ -36,133 +51,137 @@
       },
       {
         name: "Плата с Денежного оборота, руб.",
-        with_nds: 0,
-        without_nds: 0,
+        with_nds: paymentWithVAT,
+        without_nds: paymentWithoutVAT,
       },
     ],
   });
 
-  const handleBaseInput = (event: Event, row: unknown) => {
-    const input = event.target as HTMLInputElement;
-    row.sum = input.value.replace(/[^\d.]/g, "");
-    hasChanges.value = true;
-  };
-
-  const formatBaseValue = (row: unknown) => {
-    if (row.sum) {
-      const num = parseFloat(row.sum);
-      if (!isNaN(num)) {
-        row.sum = num.toFixed(2);
-      }
+  onMounted(async () => {
+    try {
+      await loadReport("/tenants/reports/-1");
+    } catch (error) {
+      console.error("Ошибка при загрузке данных:", error);
     }
-  };
-
-  const formatCurrency = (value: number | string): string => {
-    const numValue = typeof value === "string" ? parseFloat(value) : value;
-    return new Intl.NumberFormat("ru-RU", {
-      style: "currency",
-      currency: "RUB",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(isNaN(numValue) ? 0 : numValue);
-  };
+  });
 </script>
 
 <template>
-  <StepsCoreHeader
-    step-title="Расчет платы с Денежного оборота в Помещении"
-    :step-current="4"
-    :step-total="4"
-  />
+  <div>
+    <StepsCoreHeader
+      step-title="Расчет платы с Денежного оборота в Помещении"
+      :step-current="4"
+      :step-total="4"
+    />
 
-  <StepsCoreMain>
-    <section :class="$style.section">
-      <div :class="$style.table">
-        <!-- Заголовок таблицы -->
-        <div :class="$style.tableRow">
+    <StepsCoreMain>
+      <section :class="$style.section">
+        <div :class="$style.table">
+          <div :class="$style.tableRow">
+            <div
+              v-for="(col, index) in resulTableData?.header"
+              :key="index"
+              :class="[
+                $style.tableHeaderCell,
+                { [$style.spanColumns]: index === 0 },
+              ]"
+            >
+              {{ col.label }}
+            </div>
+          </div>
+
           <div
-            v-for="(col, index) in resulTableData?.header"
-            :key="index"
-            :class="[
-              $style.tableHeaderCell,
-              { [$style.spanColumns]: index === 0 },
-            ]"
+            v-for="(row, rowIndex) in resulTableData?.body"
+            :key="rowIndex"
+            :class="$style.tableRow"
           >
-            {{ col.label }}
+            <div :class="[$style.tableCell, $style.nameCell]">
+              {{ row.name }}
+            </div>
+
+            <template v-if="row.name === 'База сравнения за отчетный период'">
+              <div :class="[$style.tableCell, $style.sumCell]" :colspan="2">
+                <input
+                  :value="baseComparisonValue"
+                  type="text"
+                  :class="$style.baseInput"
+                  @input="handleBaseInput($event)"
+                  @blur="formatBaseValue()"
+                />
+              </div>
+            </template>
+            <template v-else-if="row.name === 'Процент с Денежного оборота, %'">
+              <div :class="[$style.tableCell, $style.sumCell]" :colspan="2">
+                {{
+                  Number(row.sum) === Math.floor(row.sum)
+                    ? Math.floor(row.sum)
+                    : row.sum
+                }}%
+              </div>
+            </template>
+            <template
+              v-else-if="row.name === 'Процент с Денежного оборота, руб'"
+            >
+              <div :class="$style.tableCell">
+                {{ row.with_nds ? formatCurrency(row.with_nds) : "" }}
+              </div>
+              <div :class="$style.tableCell">
+                {{ row.without_nds ? formatCurrency(row.without_nds) : "" }}
+              </div>
+            </template>
+            <template
+              v-else-if="row.name === 'Плата с Денежного оборота, руб.'"
+            >
+              <div :class="$style.tableCell">
+                {{ formatCurrency(row.with_nds) }}
+              </div>
+              <div :class="$style.tableCell">
+                {{ formatCurrency(row.without_nds) }}
+              </div>
+            </template>
+            <template v-else>
+              <div :class="$style.tableCell">
+                {{
+                  row.with_nds ? formatCurrency(parseFloat(row.with_nds)) : ""
+                }}
+              </div>
+              <div :class="$style.tableCell">
+                {{
+                  row.without_nds
+                    ? formatCurrency(parseFloat(row.without_nds))
+                    : ""
+                }}
+              </div>
+            </template>
           </div>
         </div>
+      </section>
+    </StepsCoreMain>
 
-        <div
-          v-for="(row, rowIndex) in resulTableData?.body"
-          :key="rowIndex"
-          :class="$style.tableRow"
+    <StepsCoreNavigation :step="4" :show-back="true" :show-next="false">
+      <template #back>
+        <UButton class="steps-nav-btn ghost" @click="handleBack">Назад</UButton>
+      </template>
+      <template #action>
+        <UButton
+          class="steps-nav-btn ghost"
+          :loading="isSaving"
+          @click="savingReport"
         >
-          <div :class="[$style.tableCell, $style.nameCell]">{{ row.name }}</div>
-
-          <template v-if="row.name === 'База сравнения за отчетный период'">
-            <div :class="[$style.tableCell, $style.sumCell]" :colspan="2">
-              <input
-                v-model="row.sum"
-                type="text"
-                :class="$style.baseInput"
-                @input="handleBaseInput($event, row)"
-                @blur="formatBaseValue(row)"
-              />
-            </div>
-          </template>
-          <template v-else-if="row.name === 'Процент с Денежного оборота, %'">
-            <div :class="[$style.tableCell, $style.sumCell]" :colspan="2">
-              {{
-                Number(row.sum) === Math.floor(row.sum)
-                  ? Math.floor(row.sum)
-                  : row.sum
-              }}%
-            </div>
-          </template>
-          <template v-else-if="row.name === 'Процент с Денежного оборота, руб'">
-            <div :class="$style.tableCell">
-              {{ row.with_nds ? formatCurrency(row.with_nds) : "" }}
-            </div>
-            <div :class="$style.tableCell">
-              {{ row.without_nds ? formatCurrency(row.without_nds) : "" }}
-            </div>
-          </template>
-          <template v-else-if="row.name === 'Плата с Денежного оборота, руб.'">
-            <div :class="$style.tableCell">
-              {{ formatCurrency(row.with_nds) }}
-            </div>
-            <div :class="$style.tableCell">
-              {{ formatCurrency(row.without_nds) }}
-            </div>
-          </template>
-          <template v-else>
-            <div :class="$style.tableCell">
-              {{ row.with_nds ? formatCurrency(parseFloat(row.with_nds)) : "" }}
-            </div>
-            <div :class="$style.tableCell">
-              {{
-                row.without_nds
-                  ? formatCurrency(parseFloat(row.without_nds))
-                  : ""
-              }}
-            </div>
-          </template>
-        </div>
-      </div>
-    </section>
-  </StepsCoreMain>
-
-  <StepsCoreNavigation :step="4" :show-back="true" :show-next="false">
-    <template #back>
-      <UButton class="steps-nav-btn ghost" @click="handleBack">Назад</UButton>
-    </template>
-    <template #action>
-      <UButton class="steps-nav-btn ghost" @click="saveData"
-        >Сохранить
-      </UButton>
-    </template>
-    <template #next />
-  </StepsCoreNavigation>
+          {{ isSaving ? "Формирование..." : "Сформировать отчет" }}
+        </UButton>
+      </template>
+      <template #next>
+        <!--        <UButton-->
+        <!--          class="steps-nav-btn solid"-->
+        <!--          @click="loadReport"-->
+        <!--          :disabled="downloadingReport || !reportId"-->
+        <!--        >-->
+        <!--          {{ downloadingReport ? "Скачивание..." : "Скачать отчет" }}-->
+        <!--        </UButton>-->
+      </template>
+    </StepsCoreNavigation>
+  </div>
 </template>
 
 <style module lang="scss">

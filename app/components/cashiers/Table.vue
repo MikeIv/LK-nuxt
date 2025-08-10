@@ -2,33 +2,60 @@
   import VueDatePicker from "@vuepic/vue-datepicker";
   import "@vuepic/vue-datepicker/dist/main.css";
   import { formatDate } from "~/utils/date";
+  import { useCashiersKktInput } from "~/composables/tables/useCashiersKktInput";
+  import { useCashiersTableMethods } from "~/composables/tables/useCashiersTableMethods";
 
-  const props = defineProps({
-    block: {
-      type: Object,
-      required: true,
-    },
-    index: {
-      type: Number,
-      required: true,
-    },
-    invalidFields: {
-      type: Object,
-      required: true,
-    },
-  });
+  interface Block {
+    id?: string;
+    name: string;
+    order: number;
+    registration_number: string;
+    serial_number: string;
+    fn_number: string;
+    registered_at: Date | null;
+    installed_at: Date | null;
+    isDirty?: boolean;
+  }
 
+  interface Props {
+    block: Block;
+    invalidFields: Record<string, boolean>;
+    index: number;
+    isFromApi: boolean;
+  }
+
+  const props = defineProps<Props>();
   const emit = defineEmits([
     "update:block",
     "removeBlock",
     "update:invalidFields",
   ]);
 
-  const localBlock = ref({ ...props.block });
-  const editingTitle = ref(false);
-  const titleInput = ref<HTMLInputElement | null>(null);
+  const localBlock = ref<Block>({ ...props.block });
+  const index = ref(props.index);
 
-  const isFromApi = computed(() => !!localBlock.value.id);
+  const isFromApi = computed(() => props.isFromApi);
+
+  const {
+    localValue: registrationNumber,
+    isInvalid,
+    validateRegistrationNumber,
+    handleKeyDown,
+    inputClasses,
+  } = useCashiersKktInput(
+    props.block.registration_number || "",
+    isFromApi.value,
+  );
+
+  const {
+    editingTitle,
+    titleInput,
+    startTitleEditing,
+    handleTitleEditEnd,
+    validateDigitsInput,
+    handleDateChange,
+    emitRemoveBlock,
+  } = useCashiersTableMethods(localBlock, emit, index);
 
   watch(
     () => props.block,
@@ -37,79 +64,6 @@
     },
     { deep: true },
   );
-
-  const updateLocalBlock = (field: string, value: unknown) => {
-    localBlock.value = {
-      ...localBlock.value,
-      [field]: value,
-      isDirty: true,
-    };
-    emit("update:block", localBlock.value);
-  };
-
-  const startTitleEditing = () => {
-    editingTitle.value = true;
-    nextTick(() => {
-      if (titleInput.value) {
-        titleInput.value.focus();
-        titleInput.value.setSelectionRange(0, titleInput.value.value.length);
-      }
-    });
-  };
-
-  const handleTitleEditEnd = () => {
-    if (!localBlock.value.name.trim()) {
-      updateLocalBlock("name", `Касса ${localBlock.value.order}`);
-    }
-    editingTitle.value = false;
-    emit("update:block", localBlock.value);
-  };
-
-  const validateRegistrationNumber = (event: Event) => {
-    const input = event.target as HTMLInputElement;
-    let value = input.value.replace(/\D/g, "");
-
-    if (value.length > 16) {
-      value = value.slice(0, 16);
-    }
-
-    updateLocalBlock("registration_number", value);
-
-    if (value.length === 16) {
-      const updatedInvalidFields = Object.fromEntries(
-        Object.entries(props.invalidFields).filter(
-          ([key]) => key !== `regNum-${props.index}`,
-        ),
-      );
-      emit("update:invalidFields", updatedInvalidFields);
-    }
-  };
-
-  console.log(
-    "Current registration number:",
-    localBlock.value.registration_number,
-  );
-  console.log("Invalid fields:", props.invalidFields);
-
-  const validateDigitsInput = (event: Event, field: string) => {
-    const input = event.target as HTMLInputElement;
-    const value = input.value.replace(/\D/g, "");
-    updateLocalBlock(field, value);
-  };
-
-  const handleDateChange = (field: string, date: Date | null) => {
-    updateLocalBlock(field, date);
-  };
-
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (!/[0-9]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(event.key)) {
-      event.preventDefault();
-    }
-  };
-
-  const emitRemoveBlock = () => {
-    emit("removeBlock", localBlock.value);
-  };
 </script>
 
 <template>
@@ -118,7 +72,7 @@
       <input
         v-if="editingTitle"
         ref="titleInput"
-        :value="localBlock.name"
+        v-model="localBlock.name"
         :class="[
           {
             'cashes.editing': editingTitle,
@@ -130,7 +84,6 @@
         placeholder="Введите название кассы"
         @keyup.enter="handleTitleEditEnd"
         @blur="handleTitleEditEnd"
-        @input="updateLocalBlock('name', $event.target.value)"
       />
       <p v-else :class="cashes.titleText">
         {{ localBlock.name || "Не указано" }}
@@ -158,37 +111,29 @@
     <div :class="cashes.row">
       <div :class="cashes.column">
         <span :class="cashes.colTitle">Регистрационный номер ККТ</span>
-        <input
-          :value="localBlock.registration_number"
-          :class="[
-            {
-              'readonly-input': isFromApi,
-              'error-field':
-                invalidFields[`regNum-${index}`] ||
-                (localBlock.registration_number &&
-                  localBlock.registration_number.length !== 16),
-            },
-            cashes.input,
-          ]"
-          type="text"
-          placeholder="Введите 16 цифр"
-          :readonly="isFromApi"
-          maxlength="16"
-          inputmode="numeric"
-          pattern="\d{16}"
-          @input="validateRegistrationNumber($event)"
-          @keydown="handleKeyDown"
-        />
-        <small
-          v-if="
-            localBlock.registration_number &&
-            localBlock.registration_number.length !== 16
-          "
-          class="casher-block__error-hint"
-        >
-          Номер содержит ровно 16 цифр
-        </small>
+        <template v-if="isFromApi">
+          <span :class="[cashes.kkt, cashes.kkt]">
+            {{ block.registration_number || "Не указан" }}
+          </span>
+        </template>
+        <template v-else>
+          <input
+            :value="registrationNumber"
+            :class="[inputClasses, cashes.input]"
+            type="text"
+            placeholder="Введите 16 цифр"
+            maxlength="16"
+            inputmode="numeric"
+            pattern="\d{16}"
+            @input="validateRegistrationNumber($event)"
+            @keydown="handleKeyDown"
+          />
+          <small v-if="isInvalid" :class="cashes.errorKkt">
+            Номер содержит ровно 16 цифр
+          </small>
+        </template>
       </div>
+
       <div :class="cashes.column">
         <span :class="cashes.colTitle">Заводской номер ККТ</span>
         <input
@@ -208,6 +153,7 @@
           @input="validateDigitsInput($event, 'serial_number')"
         />
       </div>
+
       <div :class="cashes.column">
         <span :class="cashes.colTitle">Номер фискального накопителя</span>
         <input
@@ -227,6 +173,7 @@
           @input="validateDigitsInput($event, 'fn_number')"
         />
       </div>
+
       <div :class="cashes.column">
         <span :class="cashes.colTitle">Дата постановки на учёт</span>
         <VueDatePicker
@@ -244,17 +191,13 @@
           "
           placeholder="Выберите дату"
           class="cashes-picker"
-          :class="[
-            {
-              'error-data-field': invalidFields[`regDate-${index}`],
-            },
-            cashes.inputDate,
-          ]"
+          :class="cashes.inputDate"
           @update:model-value="
             (date) => handleDateChange('registered_at', date)
           "
         />
       </div>
+
       <div :class="cashes.column">
         <span :class="cashes.colTitle">Дата установки в помещении</span>
         <VueDatePicker
@@ -271,12 +214,8 @@
               : 'custom-datepicker-input'
           "
           placeholder="Выберите дату"
-          :class="[
-            {
-              'error-data-field': invalidFields[`instDate-${index}`],
-            },
-            cashes.inputDate,
-          ]"
+          class="cashes-picker"
+          :class="cashes.inputDate"
           @update:model-value="(date) => handleDateChange('installed_at', date)"
         />
       </div>
@@ -415,6 +354,26 @@
     line-height: 1.2;
   }
 
+  .kkt {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    max-width: rem(160);
+    padding: rem(4) rem(12);
+    font-size: rem(12);
+    font-weight: 600;
+    background-color: var(--a-mainBg);
+    border-radius: rem(4);
+    box-sizing: border-box;
+    cursor: none;
+  }
+
+  .errorKkt {
+    color: var(--a-errorText);
+    font-size: 0.625rem;
+    margin-top: 4px;
+  }
+
   .input {
     display: flex;
     justify-content: center;
@@ -433,17 +392,26 @@
 
   .deleteBtn {
     position: absolute;
-    top: rem(24);
-    right: rem(22);
+    top: rem(14);
+    right: rem(14);
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+
+    &:hover {
+      transform: scale(1.1);
+    }
   }
 
   .icon {
     width: rem(22);
     height: rem(22);
     background-color: var(--a-bgAccent);
+
+    &:hover {
+      background-color: var(--a-bgAccentDark);
+    }
   }
 
   .inputDate {
@@ -462,7 +430,7 @@
     .dp__input_wrap {
       .dp__input {
         width: rem(170);
-        padding-left: rem(34);
+        padding: rem(1) rem(12) rem(1) rem(36);
         font-size: rem(12);
         background-color: var(--a-mainBg);
         border: 1px solid var(--a-borderAccentLight);

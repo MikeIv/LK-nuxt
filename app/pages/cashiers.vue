@@ -1,6 +1,4 @@
 <script setup lang="ts">
-  import { useCashersStore } from "~/stores/cashers";
-
   const {
     callApi: loadKktData,
     data: kktData,
@@ -106,7 +104,7 @@
         installed_at: table.installed_at,
         order: table.order,
         isCustom: table.isCustom || false,
-        isDirty: false, // Сбрасываем флаг изменений
+        isDirty: false,
       }));
 
       cashersStore.loadFromApi(cashersToSave);
@@ -204,6 +202,7 @@
             v-model:block="allTables[index]"
             :index="index"
             :invalid-fields="invalidFields"
+            :is-from-api="!!block.id"
             @remove-block="removeBlock"
             @update:invalid-fields="invalidFields = $event"
           />

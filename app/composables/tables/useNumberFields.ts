@@ -125,9 +125,9 @@ export const useNumberFields = (
       error = "Поле обязательно для заполнения";
     }
     // Проверка на ноль (если не разрешено)
-    else if (value === "0,00" && !rules.allowZero && rules.required) {
-      error = "Значение не может быть нулевым";
-    }
+    // else if (value === "0,00" && !rules.allowZero && rules.required) {
+    //   error = "Значение не может быть нулевым";
+    // }
     // Проверка минимального значения
     else if (rules.min !== undefined) {
       const numValue = parseFloat(value.replace(",", ".") || 0);
