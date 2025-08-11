@@ -56,8 +56,9 @@
       header: "Статус",
       cell: ({ row }) => {
         const statusMap: Record<string, string> = {
-          CorrectionRequested: "Запрошена коррекция",
-          // добавьте другие статусы по необходимости
+          CorrectionRequested: "Запрошено исправление",
+          Submitted: "Сформирован",
+          // другие статусы
         };
         return statusMap[row.original.status] || row.original.status;
       },
@@ -217,7 +218,7 @@
   .tableContainer {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: rem(600);
     overflow: hidden;
   }
 
