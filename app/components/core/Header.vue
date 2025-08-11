@@ -2,7 +2,7 @@
   import { useAuthStore } from "~/stores/auth";
   import { useUser } from "~/stores/user";
   import { useApi } from "~/composables/useApi";
-  import { useStepTwoStore } from "../../stores/stepTwo";
+  import { useStepTwoStore } from "~/stores/stepTwo";
 
   const userStore = useUser();
   const { isLoading, error } = useApi<unknown>();
