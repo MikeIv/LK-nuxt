@@ -1,6 +1,7 @@
 import { useApi } from "~/composables/useApi";
 import { useStepOneStore } from "~/stores/stepOne";
-import { useStepThreeStore } from "../stores/stepThree";
+import { useStepTwoStore } from "~/stores/stepTwo";
+import { useStepThreeStore } from "~/stores/stepThree";
 
 export const useReportCalculation = () => {
   const {
@@ -8,38 +9,38 @@ export const useReportCalculation = () => {
     data: reportData,
     isLoading,
     error,
-  } = useApi<UserData>();
+  } = useApi<unknown>();
   const stepOneStore = useStepOneStore();
-  const tablesStore = useTablesStore();
+  const stepTwoStore = useStepTwoStore();
   const stepThreeStore = useStepThreeStore();
-  console.log("stepThreeStore", stepThreeStore);
 
   const hasChanges = ref(false);
   const baseComparisonValue = ref(0);
   const isSaving = ref(false);
 
   const rentPercentage = computed(() => {
-    return reportData.value?.report.rent_percentage ?? 0;
+    return reportData.value?.report?.rent_percentage ?? 0;
   });
 
   const percentageWithVAT = computed(() => {
-    return (
-      ((tablesStore.totalWithVAT || 0) * (rentPercentage.value || 0)) / 100
-    );
+    const total = stepTwoStore.totalWithVAT - stepThreeStore.totalWithVAT;
+    return ((total || 0) * (rentPercentage.value || 0)) / 100;
   });
 
   const percentageWithoutVAT = computed(() => {
-    return (
-      ((tablesStore.totalWithoutVAT || 0) * (rentPercentage.value || 0)) / 100
-    );
+    const total = stepTwoStore.totalWithoutVAT - stepThreeStore.totalWithoutVAT;
+    return ((total || 0) * (rentPercentage.value || 0)) / 100;
   });
 
   const paymentWithVAT = computed(() => {
-    return percentageWithVAT.value - baseComparisonValue.value;
+    return Math.max(0, percentageWithVAT.value - baseComparisonValue.value);
   });
 
   const paymentWithoutVAT = computed(() => {
-    return (percentageWithVAT.value - baseComparisonValue.value) * 1.2;
+    return Math.max(
+      0,
+      (percentageWithVAT.value - baseComparisonValue.value) / 1.2,
+    );
   });
 
   const formatCurrency = (value: number | string): string => {
@@ -70,65 +71,73 @@ export const useReportCalculation = () => {
   const savingReport = async () => {
     isSaving.value = true;
     try {
-      const reportData = {
+      if (!stepOneStore.dateRange || stepOneStore.dateRange.length < 2) {
+        throw new Error("Не указан период отчета");
+      }
+
+      // Проверяем наличие данных в хранилищах
+      console.log("StepTwoStore data:", stepTwoStore.getAllData());
+      console.log("StepThreeStore data:", stepThreeStore.getAllData());
+
+      const reportPayload = {
         status: "Submitted",
         report: {
-          visitors_count: stepOneStore.visitorsCount,
-          receipts_count: stepOneStore.checksCount,
-          comparison_base: baseComparisonValue.value,
-          rent_percentage: rentPercentage.value,
-          kkts: tablesStore.kkt.rows.map((row) => ({
-            name: row.name,
-            registration_number: row.registration_number,
-            start_meter_reading: Number(row.start_meter_reading) || 0,
-            end_meter_reading: Number(row.end_meter_reading) || 0,
+          visitors_count: stepOneStore.visitorsCount || 0,
+          receipts_count: stepOneStore.checksCount || 0,
+          comparison_base: baseComparisonValue.value || 0,
+          rent_percentage: rentPercentage.value || 0,
+          kkts: stepTwoStore.kkt.rows.map((row) => ({
+            name: row.name || "",
+            registration_number: row.registration_number || "",
+            start_meter_reading: parseFloat(row.start_meter_reading) || 0,
+            end_meter_reading: parseFloat(row.end_meter_reading) || 0,
             amount_without_advance_with_nds:
-              Number(row.amount_without_advance_with_nds) || 0,
+              parseFloat(row.amount_without_advance_with_nds) || 0,
             amount_without_advance_nds:
-              Number(row.amount_without_advance_nds) || 0,
+              parseFloat(row.amount_without_advance_nds) || 0,
             advance_without_certificates_with_nds:
-              Number(row.advance_without_certificates_with_nds) || 0,
+              parseFloat(row.advance_without_certificates_with_nds) || 0,
             advance_without_certificates_nds:
-              Number(row.advance_without_certificates_nds) || 0,
+              parseFloat(row.advance_without_certificates_nds) || 0,
             file_ids: row.file_ids || [],
           })),
-          cash_turnovers_without_kkt: tablesStore.cashKkt.rows.map((row) => ({
-            name: row.name,
-            settlement_account_number: row.settlement_account_number,
-            amount_with_nds: Number(row.amount_with_nds) || 0,
-            amount_nds: Number(row.amount_nds) || 0,
+          cash_turnovers_without_kkt: stepTwoStore.cashKkt.rows.map((row) => ({
+            name: row.name || "",
+            settlement_account_number: row.settlement_account_number || "",
+            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+            amount_nds: parseFloat(row.amount_nds) || 0,
             file_ids: row.file_ids || [],
           })),
-          cash_turnovers_non_cash: tablesStore.nonCash.rows.map((row) => ({
-            name: row.name,
-            amount_with_nds: Number(row.amount_with_nds) || 0,
-            amount_nds: Number(row.amount_nds) || 0,
+          cash_turnovers_non_cash: stepTwoStore.nonCash.rows.map((row) => ({
+            name: row.name || "",
+            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+            amount_nds: parseFloat(row.amount_nds) || 0,
             file_ids: row.file_ids || [],
           })),
-          cash_turnovers_other: tablesStore.otherSum.rows.map((row) => ({
-            name: row.name,
-            amount_with_nds: Number(row.amount_with_nds) || 0,
-            amount_nds: Number(row.amount_nds) || 0,
+          cash_turnovers_other: stepTwoStore.otherSum.rows.map((row) => ({
+            name: row.name || "",
+            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+            amount_nds: parseFloat(row.amount_nds) || 0,
             file_ids: row.file_ids || [],
           })),
           kkts_exclusions: stepThreeStore.refunds.rows.map((row) => ({
-            name: row.name,
-            registration_number: row.registration_number,
+            name: row.name || "",
+            registration_number: row.registration_number || "",
             returns_goods_services_with_nds:
-              Number(row.returns_goods_services_with_nds) || 0,
+              parseFloat(row.returns_goods_services_with_nds) || 0,
             returns_goods_services_nds:
-              Number(row.returns_goods_services_nds) || 0,
+              parseFloat(row.returns_goods_services_nds) || 0,
             gift_certificates_sold_with_nds:
-              Number(row.gift_certificates_sold_with_nds) || 0,
+              parseFloat(row.gift_certificates_sold_with_nds) || 0,
             gift_certificates_sold_nds:
-              Number(row.gift_certificates_sold_nds) || 0,
+              parseFloat(row.gift_certificates_sold_nds) || 0,
             file_ids: row.file_ids || [],
           })),
           cash_turnover_exclusions_other: stepThreeStore.otherAmounts.rows.map(
             (row) => ({
-              name: row.name,
-              amount_with_nds: Number(row.amount_with_nds) || 0,
-              amount_nds: Number(row.amount_nds) || 0,
+              name: row.name || "",
+              amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+              amount_nds: parseFloat(row.amount_nds) || 0,
               file_ids: row.file_ids || [],
             }),
           ),
@@ -139,16 +148,20 @@ export const useReportCalculation = () => {
         },
       };
 
+      console.log("Sending report payload:", reportPayload);
       const response = await loadReport("/tenants/reports", {
         method: "POST",
-        body: reportData,
+        body: reportPayload,
       });
 
-      if (response) {
-        console.log("Отчет успешно отправлен");
+      if (!response) {
+        throw new Error("Не удалось сохранить отчет");
       }
-    } catch (error) {
-      console.error("Ошибка при отправке отчета:", error);
+
+      return response;
+    } catch (err) {
+      console.error("Ошибка при сохранении отчета:", err);
+      throw err;
     } finally {
       isSaving.value = false;
     }
@@ -171,7 +184,7 @@ export const useReportCalculation = () => {
     isLoading,
     error,
     reportData,
-    tablesStore,
+    stepTwoStore,
     stepThreeStore,
   };
 };

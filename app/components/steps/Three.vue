@@ -25,7 +25,7 @@
 
   const isSaving = ref(false);
   const stepOneStore = useStepOneStore();
-  const tablesStore = useStepThreeStore();
+  const stepThreeStore = useStepThreeStore();
 
   const saveData = async () => {
     isSaving.value = true;
@@ -151,12 +151,38 @@
     }
 
     try {
-      tablesStore.saveAllTables(tablesData);
+      // Сохраняем данные в хранилище stepThreeStore
+      stepThreeStore.updateTable("refunds", {
+        rows: tablesData.refunds.rows,
+        withVAT: tablesData.refunds.totals.withVAT,
+        VAT: tablesData.refunds.totals.VAT,
+      });
+
+      stepThreeStore.updateTable("otherAmounts", {
+        rows: tablesData.otherAmounts.rows,
+        withVAT: tablesData.otherAmounts.totals.withVAT,
+        VAT: tablesData.otherAmounts.totals.VAT,
+      });
+
       console.log("Данные успешно сохранены:", tablesData);
+
+      // Добавляем уведомление об успешном сохранении
+      useToast().add({
+        title: "Данные сохранены",
+        description: "Данные успешно сохранены перед переходом",
+        color: "green",
+      });
+
       navigateTo("/record/4");
     } catch (error) {
       console.error("Ошибка сохранения:", error);
-      // Обработка ошибки (например, показать сообщение пользователю)
+
+      // Добавляем уведомление об ошибке
+      useToast().add({
+        title: "Ошибка сохранения",
+        description: error.message || "Не удалось сохранить данные",
+        color: "red",
+      });
     }
   };
 
@@ -166,11 +192,11 @@
 
       await nextTick();
 
-      if (tablesStore.refunds.rows.length > 0) {
-        refundsTableRef.value?.setData?.(tablesStore.refunds.rows);
+      if (stepThreeStore.refunds.rows.length > 0) {
+        refundsTableRef.value?.setData?.(stepThreeStore.refunds.rows);
       }
-      if (tablesStore.otherAmounts.rows.length > 0) {
-        otherAmountsTableRef.value?.setData?.(tablesStore.otherAmounts.rows);
+      if (stepThreeStore.otherAmounts.rows.length > 0) {
+        otherAmountsTableRef.value?.setData?.(stepThreeStore.otherAmounts.rows);
       }
     } catch (error) {
       console.error("Ошибка при загрузке данных:", error);

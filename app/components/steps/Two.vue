@@ -1,4 +1,6 @@
 <script setup lang="ts">
+  import { useStepTwoStore } from "~/stores/stepTwo";
+
   const handleBack = () => {
     console.log("Back");
     navigateTo("/record/1");
@@ -23,7 +25,7 @@
   );
 
   const stepOneStore = useStepOneStore();
-  const tablesStore = useTablesStore();
+  const stepTwoStore = useStepTwoStore();
 
   const kktTableRef = ref();
   const cashKktTableRef = ref();
@@ -54,46 +56,45 @@
         },
       };
 
-      // Подготавливаем данные для отправки
       const reportData = {
         status: "Draft",
         report: {
           visitors_count: stepOneStore.visitorsCount,
           receipts_count: stepOneStore.checksCount,
-          comparison_base: 0, // Заполните при необходимости
-          rent_percentage: 0, // Заполните при необходимости
+          comparison_base: 0,
+          rent_percentage: 0,
           kkts: tablesData.kkt.rows.map((row) => ({
             name: row.name,
             registration_number: row.registration_number,
-            start_meter_reading: Number(row.start_meter_reading) || 0,
-            end_meter_reading: Number(row.end_meter_reading) || 0,
+            start_meter_reading: parseFloat(row.start_meter_reading) || 0,
+            end_meter_reading: parseFloat(row.end_meter_reading) || 0,
             amount_without_advance_with_nds:
-              Number(row.amount_without_advance_with_nds) || 0,
+              parseFloat(row.amount_without_advance_with_nds) || 0,
             amount_without_advance_nds:
-              Number(row.amount_without_advance_nds) || 0,
+              parseFloat(row.amount_without_advance_nds) || 0,
             advance_without_certificates_with_nds:
-              Number(row.advance_without_certificates_with_nds) || 0,
+              parseFloat(row.advance_without_certificates_with_nds) || 0,
             advance_without_certificates_nds:
-              Number(row.advance_without_certificates_nds) || 0,
+              parseFloat(row.advance_without_certificates_nds) || 0,
             file_ids: row.file_ids || [],
           })),
           cash_turnovers_without_kkt: tablesData.cashKkt.rows.map((row) => ({
             name: row.name,
             settlement_account_number: row.settlement_account_number,
-            amount_with_nds: Number(row.amount_with_nds) || 0,
-            amount_nds: Number(row.amount_nds) || 0,
+            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+            amount_nds: parseFloat(row.amount_nds) || 0,
             file_ids: row.file_ids || [],
           })),
           cash_turnovers_non_cash: tablesData.nonCash.rows.map((row) => ({
             name: row.name,
-            amount_with_nds: Number(row.amount_with_nds) || 0,
-            amount_nds: Number(row.amount_nds) || 0,
+            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+            amount_nds: parseFloat(row.amount_nds) || 0,
             file_ids: row.file_ids || [],
           })),
           cash_turnovers_other: tablesData.otherSum.rows.map((row) => ({
             name: row.name,
-            amount_with_nds: Number(row.amount_with_nds) || 0,
-            amount_nds: Number(row.amount_nds) || 0,
+            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+            amount_nds: parseFloat(row.amount_nds) || 0,
             file_ids: row.file_ids || [],
           })),
           period: {
@@ -103,7 +104,6 @@
         },
       };
 
-      // Отправляем данные на сервер
       const response = await loadReport("/tenants/reports", {
         method: "POST",
         body: reportData,
@@ -111,11 +111,32 @@
 
       if (response) {
         console.log("Черновик успешно сохранён");
-        isSaving.value = true;
-        // Можно добавить уведомление об успешном сохранении
+        // Обновляем данные в хранилище
+        stepTwoStore.updateTable("kkt", {
+          rows: tablesData.kkt.rows,
+          withVAT: tablesData.kkt.totals.withVAT,
+          VAT: tablesData.kkt.totals.VAT,
+        });
+        stepTwoStore.updateTable("cashKkt", {
+          rows: tablesData.cashKkt.rows,
+          withVAT: tablesData.cashKkt.totals.withVAT,
+          VAT: tablesData.cashKkt.totals.VAT,
+        });
+        stepTwoStore.updateTable("nonCash", {
+          rows: tablesData.nonCash.rows,
+          withVAT: tablesData.nonCash.totals.withVAT,
+          VAT: tablesData.nonCash.totals.VAT,
+        });
+        stepTwoStore.updateTable("otherSum", {
+          rows: tablesData.otherSum.rows,
+          withVAT: tablesData.otherSum.totals.withVAT,
+          VAT: tablesData.otherSum.totals.VAT,
+        });
       }
     } catch (error) {
       console.error("Ошибка при сохранении черновика:", error);
+    } finally {
+      isSaving.value = false;
     }
   };
 
@@ -139,45 +160,48 @@
       },
     };
 
-    const validateTablesData = (data: {
-      kkt: { rows: unknown[]; totals: { withVAT: number; VAT: number } };
-      cashKkt: { rows: unknown[]; totals: { withVAT: number; VAT: number } };
-      nonCash: { rows: unknown[]; totals: { withVAT: number; VAT: number } };
-      otherSum: { rows: unknown[]; totals: { withVAT: number; VAT: number } };
-    }): boolean => {
-      // 1. Проверка на пустые таблицы (если требуется)
+    const validateTablesData = (data) => {
       if (data.kkt.rows.length === 0) {
-        console.warn("Таблица ККТ пуста");
+        console.error("Таблица ККТ не может быть пустой");
         return false;
       }
-
-      if (isNaN(data.kkt.totals.withVAT) || data.kkt.totals.withVAT < 0) {
-        console.warn("Некорректная сумма в таблице ККТ");
-        return false;
-      }
-
-      // 3. Добавьте другие проверки по необходимости...
-      // Например:
-      // - Проверка обязательных полей в строках
-      // - Проверка формата данных
-      // - Сравнение итоговых сумм
 
       return true;
     };
 
     if (!validateTablesData(tablesData)) {
-      console.error("Ошибка: Данные таблиц невалидны");
-      // Можно добавить UI-уведомление (например, через toast)
+      console.error("Ошибка валидации данных");
+      // Здесь можно добавить UI-уведомление об ошибке
       return;
     }
 
     try {
-      tablesStore.saveAllTables(tablesData);
-      console.log("Данные успешно сохранены:", tablesData);
+      // Сохраняем данные в хранилище перед переходом
+      stepTwoStore.updateTable("kkt", {
+        rows: tablesData.kkt.rows,
+        withVAT: tablesData.kkt.totals.withVAT,
+        VAT: tablesData.kkt.totals.VAT,
+      });
+      stepTwoStore.updateTable("cashKkt", {
+        rows: tablesData.cashKkt.rows,
+        withVAT: tablesData.cashKkt.totals.withVAT,
+        VAT: tablesData.cashKkt.totals.VAT,
+      });
+      stepTwoStore.updateTable("nonCash", {
+        rows: tablesData.nonCash.rows,
+        withVAT: tablesData.nonCash.totals.withVAT,
+        VAT: tablesData.nonCash.totals.VAT,
+      });
+      stepTwoStore.updateTable("otherSum", {
+        rows: tablesData.otherSum.rows,
+        withVAT: tablesData.otherSum.totals.withVAT,
+        VAT: tablesData.otherSum.totals.VAT,
+      });
+
+      console.log("Данные успешно сохранены в хранилище");
       navigateTo("/record/3");
     } catch (error) {
-      console.error("Ошибка сохранения:", error);
-      // Обработка ошибки (например, показать сообщение пользователю)
+      console.error("Ошибка при сохранении данных:", error);
     }
   };
 
@@ -187,17 +211,29 @@
 
       await nextTick();
 
-      if (tablesStore.kkt.rows.length > 0) {
-        kktTableRef.value?.setData?.(tablesStore.kkt.rows);
+      // Загружаем данные из хранилища, если они есть
+      if (stepTwoStore.kkt.rows.length > 0) {
+        kktTableRef.value?.setData?.(stepTwoStore.kkt.rows);
+      } else if (tableKkt.value?.body?.length > 0) {
+        kktTableRef.value?.setData?.(tableKkt.value.body);
       }
-      if (tablesStore.cashKkt.rows.length > 0) {
-        cashKktTableRef.value?.setData?.(tablesStore.cashKkt.rows);
+
+      if (stepTwoStore.cashKkt.rows.length > 0) {
+        cashKktTableRef.value?.setData?.(stepTwoStore.cashKkt.rows);
+      } else if (tableCashKkt.value?.body?.length > 0) {
+        cashKktTableRef.value?.setData?.(tableCashKkt.value.body);
       }
-      if (tablesStore.nonCash.rows.length > 0) {
-        nonCashTableRef.value?.setData?.(tablesStore.nonCash.rows);
+
+      if (stepTwoStore.nonCash.rows.length > 0) {
+        nonCashTableRef.value?.setData?.(stepTwoStore.nonCash.rows);
+      } else if (tableNonCash.value?.body?.length > 0) {
+        nonCashTableRef.value?.setData?.(tableNonCash.value.body);
       }
-      if (tablesStore.otherSum.rows.length > 0) {
-        otherSumTableRef.value?.setData?.(tablesStore.otherSum.rows);
+
+      if (stepTwoStore.otherSum.rows.length > 0) {
+        otherSumTableRef.value?.setData?.(stepTwoStore.otherSum.rows);
+      } else if (tableOtherSum.value?.body?.length > 0) {
+        otherSumTableRef.value?.setData?.(tableOtherSum.value.body);
       }
     } catch (error) {
       console.error("Ошибка при загрузке данных:", error);
@@ -206,6 +242,7 @@
 </script>
 
 <template>
+  <!-- Остальная часть шаблона остается без изменений -->
   <div>
     <StepsCoreHeader
       step-title="Суммы, подлежащие включению в размер Денежного оборота в Помещении"

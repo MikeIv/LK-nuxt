@@ -1,22 +1,42 @@
 export function useDownloadReport() {
   const downloadingReport = ref(false);
   const error = ref<string | null>(null);
+  const authStore = useAuthStore();
+  const config = useRuntimeConfig();
 
   async function downloadReport(id: string | number) {
     downloadingReport.value = true;
     error.value = null;
 
     try {
-      const response = await $fetch(`/tenants/reports/${id}/pdf`, {
-        responseType: "blob",
+      // Явно указываем полный URL API
+      const apiUrl = `${config.public.apiBase}/tenants/reports/${id}/pdf`;
+
+      const response = await fetch(apiUrl, {
+        method: "GET",
         headers: {
           Accept: "application/pdf",
+          Authorization: `Bearer ${authStore.token}`,
+          ...(authStore.contractId && {
+            "contract-id": authStore.contractId.toString(),
+          }),
         },
       });
 
-      const blob = new Blob([response], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
+      if (!response.ok) {
+        throw new Error(
+          `Ошибка сервера: ${response.status} ${response.statusText}`,
+        );
+      }
 
+      // Проверяем Content-Type
+      const contentType = response.headers.get("content-type");
+      if (!contentType?.includes("application/pdf")) {
+        throw new Error(`Неверный тип ответа: ${contentType}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = `report_${id}.pdf`;
@@ -29,7 +49,11 @@ export function useDownloadReport() {
       }, 100);
     } catch (err) {
       error.value = err?.message || "Ошибка при скачивании отчета";
-      console.error("Download error:", err);
+      console.error("Download error:", {
+        error: err,
+        message: err?.message,
+        status: err?.status,
+      });
       throw err;
     } finally {
       downloadingReport.value = false;

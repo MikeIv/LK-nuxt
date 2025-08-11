@@ -9,6 +9,7 @@ type ApiOptions<T = unknown> = {
   body?: T;
   headers?: Record<string, string>;
   params?: Record<string, unknown>;
+  responseType?: "json" | "blob";
 };
 
 export const useApi = <T>() => {
@@ -22,8 +23,8 @@ export const useApi = <T>() => {
 
   const callApi = async <D = unknown>(
     endpoint: string,
-    options: ApiOptions<D> = { method: "GET" },
-  ): Promise<T | null> => {
+    options: ApiOptions<D> = { method: "GET", responseType: "json" },
+  ): Promise<T | Blob | null> => {
     const fullUrl = endpoint.startsWith("http")
       ? endpoint
       : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
@@ -34,7 +35,7 @@ export const useApi = <T>() => {
     try {
       // Базовые заголовки
       const headers: Record<string, string> = {
-        Accept: "application/json",
+        ...(options.responseType === "json" && { Accept: "application/json" }),
         ...(authStore.token && { Authorization: `Bearer ${authStore.token}` }),
         ...options.headers,
       };
@@ -44,19 +45,25 @@ export const useApi = <T>() => {
         headers["Content-Type"] = "application/json";
       }
 
-      const response = await $fetch<ApiResponse<T>>(fullUrl, {
+      const response = await $fetch<ApiResponse<T> | Blob>(fullUrl, {
         method: options.method,
         body: options.method !== "GET" ? options.body : undefined,
         params: options.method === "GET" ? options.params : undefined,
         credentials: "include",
         headers,
+        responseType: options.responseType === "blob" ? "blob" : "json",
       });
 
-      if (response.success) {
-        data.value = response.payload;
-        return response.payload;
+      if (response instanceof Blob) {
+        return response;
+      }
+
+      const apiResponse = response as ApiResponse<T>;
+      if (apiResponse.success) {
+        data.value = apiResponse.payload;
+        return apiResponse.payload;
       } else {
-        throw new Error(response.message || "Request failed");
+        throw new Error(apiResponse.message || "Request failed");
       }
     } catch (err: unknown) {
       const errorMessage = err?.message || "Request error";

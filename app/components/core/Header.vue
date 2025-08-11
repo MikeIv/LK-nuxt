@@ -2,6 +2,7 @@
   import { useAuthStore } from "~/stores/auth";
   import { useUser } from "~/stores/user";
   import { useApi } from "~/composables/useApi";
+  import { useStepTwoStore } from "../../stores/stepTwo";
 
   const userStore = useUser();
   const { isLoading, error } = useApi<unknown>();
@@ -36,7 +37,7 @@
       isLoading.value = true;
 
       const stepOneStore = useStepOneStore();
-      const stepTwoStore = useTablesStore();
+      const stepTwoStore = useStepTwoStore();
       stepOneStore.reset();
       stepTwoStore.$reset();
 
