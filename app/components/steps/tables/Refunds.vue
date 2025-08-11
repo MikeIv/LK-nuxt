@@ -2,7 +2,7 @@
   import type { RefundsTableRow } from "~/types/tables";
   import { useKktInput } from "~/composables/tables/useKktInput";
   import { useNumberFields } from "~/composables/tables/useNumberFields";
-  import { useCashCalculations } from "~/composables/tables/useCashCalculations";
+  import { useRefundsCalculations } from "~/composables/tables/useRefundsCalculations";
 
   interface RefundsTableProps {
     headers?: unknown[];
@@ -53,7 +53,10 @@
   const numberErrors = ref<Record<number, string>>({});
 
   const { handleNumberInput, handleNumberBlur, shouldShowError } =
-    useNumberFields(editableRows, numberErrors, fieldValidations);
+    useNumberFields(editableRows, numberErrors, fieldValidations, (index) => {
+      validateRow(index);
+      emitUpdate();
+    });
   const { loading: fileLoading } = useSaveFile();
   const { handleFileUploaded, handleFileRemoved } =
     useFileHandling<RefundsTableRow>({
@@ -99,7 +102,7 @@
     return errors.length === 0;
   };
 
-  const { totalWithVAT, totalVAT } = useCashCalculations(editableRows);
+  const { totalWithVAT, totalVAT } = useRefundsCalculations(editableRows);
 
   // Методы
   const createEmptyRow = (): RefundsTableRow => ({
@@ -197,8 +200,42 @@
     { immediate: true },
   );
 
-  watch(totalWithVAT, () => emitUpdate());
-  watch(totalVAT, () => emitUpdate());
+  // watch(totalWithVAT, () => emitUpdate());
+  // watch(totalVAT, () => emitUpdate());
+
+  const getTableData = () => {
+    console.log("Getting table data:", editableRows.value);
+    return {
+      rows: [...editableRows.value],
+      totals: {
+        withVAT: parseFloat(totalWithVAT.value.toFixed(2)),
+        VAT: parseFloat(totalVAT.value.toFixed(2)),
+      },
+    };
+  };
+
+  const setData = (newData: KktTableRow[]) => {
+    editableRows.value = [...newData];
+  };
+
+  defineExpose({
+    getTableData,
+    setData,
+  });
+
+  watch(
+    [totalWithVAT, totalVAT],
+    () => {
+      console.log(
+        "Totals updated - with VAT:",
+        totalWithVAT.value,
+        "VAT:",
+        totalVAT.value,
+      );
+      emitUpdate();
+    },
+    { deep: true },
+  );
 </script>
 
 <template>
@@ -290,11 +327,14 @@
               },
             ]"
             @input="
-              handleNumberInput(
-                $event,
-                'returns_goods_services_with_nds',
-                index,
-              )
+              (e) => {
+                const value = e.target.value.replace(',', '.');
+                handleNumberInput(
+                  { target: { value } },
+                  'returns_goods_services_with_nds',
+                  index,
+                );
+              }
             "
             @blur="handleNumberBlur('returns_goods_services_with_nds', index)"
           />

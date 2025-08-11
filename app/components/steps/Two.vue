@@ -35,7 +35,6 @@
   const saveData = async () => {
     isSaving.value = true;
     try {
-      // Получаем данные из всех таблиц
       const tablesData = {
         kkt: kktTableRef.value?.getTableData() || {
           rows: [],
@@ -117,7 +116,6 @@
       }
     } catch (error) {
       console.error("Ошибка при сохранении черновика:", error);
-      // Можно добавить уведомление об ошибке
     }
   };
 
