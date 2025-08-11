@@ -19,10 +19,16 @@
     tablesStore,
     loadReport,
     isLoading,
+    reportData,
+    stepThreeStore,
   } = useReportCalculation();
 
   console.log("loadReport", loadReport);
   console.log("isLoading", isLoading);
+
+  const { downloadingReport, downloadReport } = useDownloadReport();
+
+  const reportId = computed(() => reportData.value?.id);
 
   const resulTableData = ref({
     header: [
@@ -33,8 +39,10 @@
     body: [
       {
         name: "Итого Денежный оборот в Помещении",
-        with_nds: tablesStore?.totalWithVAT || "0",
-        without_nds: tablesStore?.totalWithoutVAT || "0",
+        with_nds:
+          tablesStore?.totalWithVAT - stepThreeStore?.totalWithVAT || "0",
+        without_nds:
+          tablesStore?.totalWithoutVAT - stepThreeStore?.totalWithoutVAT || "0",
       },
       {
         name: "Процент с Денежного оборота, %",
@@ -64,6 +72,16 @@
       console.error("Ошибка при загрузке данных:", error);
     }
   });
+
+  const handleDownloadReport = async () => {
+    if (!reportId.value) return;
+
+    try {
+      await downloadReport(reportId.value);
+    } catch (error) {
+      console.error("Ошибка при скачивании отчета:", error);
+    }
+  };
 </script>
 
 <template>
@@ -172,13 +190,13 @@
         </UButton>
       </template>
       <template #next>
-        <!--        <UButton-->
-        <!--          class="steps-nav-btn solid"-->
-        <!--          @click="loadReport"-->
-        <!--          :disabled="downloadingReport || !reportId"-->
-        <!--        >-->
-        <!--          {{ downloadingReport ? "Скачивание..." : "Скачать отчет" }}-->
-        <!--        </UButton>-->
+        <UButton
+          class="steps-nav-btn solid"
+          :disabled="downloadingReport || !reportId"
+          @click="handleDownloadReport"
+        >
+          {{ downloadingReport ? "Скачивание..." : "Скачать отчет" }}
+        </UButton>
       </template>
     </StepsCoreNavigation>
   </div>

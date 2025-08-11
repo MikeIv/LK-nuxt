@@ -1,5 +1,6 @@
 import { useApi } from "~/composables/useApi";
 import { useStepOneStore } from "~/stores/stepOne";
+import { useStepThreeStore } from "../stores/stepThree";
 
 export const useReportCalculation = () => {
   const {
@@ -10,6 +11,8 @@ export const useReportCalculation = () => {
   } = useApi<UserData>();
   const stepOneStore = useStepOneStore();
   const tablesStore = useTablesStore();
+  const stepThreeStore = useStepThreeStore();
+  console.log("stepThreeStore", stepThreeStore);
 
   const hasChanges = ref(false);
   const baseComparisonValue = ref(0);
@@ -108,6 +111,27 @@ export const useReportCalculation = () => {
             amount_nds: Number(row.amount_nds) || 0,
             file_ids: row.file_ids || [],
           })),
+          kkts_exclusions: stepThreeStore.refunds.rows.map((row) => ({
+            name: row.name,
+            registration_number: row.registration_number,
+            returns_goods_services_with_nds:
+              Number(row.returns_goods_services_with_nds) || 0,
+            returns_goods_services_nds:
+              Number(row.returns_goods_services_nds) || 0,
+            gift_certificates_sold_with_nds:
+              Number(row.gift_certificates_sold_with_nds) || 0,
+            gift_certificates_sold_nds:
+              Number(row.gift_certificates_sold_nds) || 0,
+            file_ids: row.file_ids || [],
+          })),
+          cash_turnover_exclusions_other: stepThreeStore.otherAmounts.rows.map(
+            (row) => ({
+              name: row.name,
+              amount_with_nds: Number(row.amount_with_nds) || 0,
+              amount_nds: Number(row.amount_nds) || 0,
+              file_ids: row.file_ids || [],
+            }),
+          ),
           period: {
             start: new Date(stepOneStore.dateRange[0]).toISOString(),
             end: new Date(stepOneStore.dateRange[1]).toISOString(),
@@ -148,5 +172,6 @@ export const useReportCalculation = () => {
     error,
     reportData,
     tablesStore,
+    stepThreeStore,
   };
 };
