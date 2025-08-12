@@ -98,9 +98,9 @@
   const createEmptyRow = (): CashTableRow => ({
     id: "",
     name: "",
-    settlement_account_number: "",
-    amount_with_nds: "",
-    amount_nds: "",
+    settlement_account_number: "0",
+    amount_with_nds: "0",
+    amount_nds: "0",
     file_ids: [],
     files: [],
     isNew: true,
@@ -312,6 +312,7 @@
           :max-files="3"
           :files="row.files || []"
           :file-ids="row.file_ids || []"
+          :is-required="true"
           @files-uploaded="
             ({ filesData }) => handleFileUploaded({ index, filesData })
           "

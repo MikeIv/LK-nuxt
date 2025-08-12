@@ -296,6 +296,7 @@
           :max-files="3"
           :files="row.files || []"
           :file-ids="row.file_ids || []"
+          :is-required="true"
           @files-uploaded="
             ({ filesData }) => handleFileUploaded({ index, filesData })
           "

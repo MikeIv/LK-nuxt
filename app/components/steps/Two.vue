@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { useStepTwoStore } from "~/stores/stepTwo";
+  import { useStepOneStore } from "~/stores/stepOne";
 
   const handleBack = () => {
     console.log("Back");
@@ -32,186 +33,71 @@
   const nonCashTableRef = ref();
   const otherSumTableRef = ref();
 
-  const isSaving = ref(false);
+  const { validateForm } = useFormValidation(
+    kktTableRef,
+    cashKktTableRef,
+    nonCashTableRef,
+    otherSumTableRef,
+  );
 
-  const saveData = async () => {
-    isSaving.value = true;
-    try {
-      const tablesData = {
-        kkt: kktTableRef.value?.getTableData() || {
-          rows: [],
-          totals: { withVAT: 0, VAT: 0 },
-        },
-        cashKkt: cashKktTableRef.value?.getTableData() || {
-          rows: [],
-          totals: { withVAT: 0, VAT: 0 },
-        },
-        nonCash: nonCashTableRef.value?.getTableData() || {
-          rows: [],
-          totals: { withVAT: 0, VAT: 0 },
-        },
-        otherSum: otherSumTableRef.value?.getTableData() || {
-          rows: [],
-          totals: { withVAT: 0, VAT: 0 },
-        },
-      };
+  const validationResult = computed(() => validateForm());
 
-      const reportData = {
-        status: "Draft",
-        report: {
-          visitors_count: stepOneStore.visitorsCount,
-          receipts_count: stepOneStore.checksCount,
-          comparison_base: 0,
-          rent_percentage: 0,
-          kkts: tablesData.kkt.rows.map((row) => ({
-            name: row.name,
-            registration_number: row.registration_number,
-            start_meter_reading: parseFloat(row.start_meter_reading) || 0,
-            end_meter_reading: parseFloat(row.end_meter_reading) || 0,
-            amount_without_advance_with_nds:
-              parseFloat(row.amount_without_advance_with_nds) || 0,
-            amount_without_advance_nds:
-              parseFloat(row.amount_without_advance_nds) || 0,
-            advance_without_certificates_with_nds:
-              parseFloat(row.advance_without_certificates_with_nds) || 0,
-            advance_without_certificates_nds:
-              parseFloat(row.advance_without_certificates_nds) || 0,
-            file_ids: row.file_ids || [],
-          })),
-          cash_turnovers_without_kkt: tablesData.cashKkt.rows.map((row) => ({
-            name: row.name,
-            settlement_account_number: row.settlement_account_number,
-            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
-            amount_nds: parseFloat(row.amount_nds) || 0,
-            file_ids: row.file_ids || [],
-          })),
-          cash_turnovers_non_cash: tablesData.nonCash.rows.map((row) => ({
-            name: row.name,
-            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
-            amount_nds: parseFloat(row.amount_nds) || 0,
-            file_ids: row.file_ids || [],
-          })),
-          cash_turnovers_other: tablesData.otherSum.rows.map((row) => ({
-            name: row.name,
-            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
-            amount_nds: parseFloat(row.amount_nds) || 0,
-            file_ids: row.file_ids || [],
-          })),
-          period: {
-            start: new Date(stepOneStore.dateRange[0]).toISOString(),
-            end: new Date(stepOneStore.dateRange[1]).toISOString(),
-          },
-        },
-      };
+  const isFormValid = computed(() => validationResult.value.isValid);
+  const validationError = ref("");
 
-      const response = await loadReport("/tenants/reports", {
-        method: "POST",
-        body: reportData,
-      });
+  watch(
+    validationResult,
+    (result) => {
+      validationError.value = result.error;
+    },
+    { immediate: true },
+  );
 
-      if (response) {
-        console.log("Черновик успешно сохранён");
-        // Обновляем данные в хранилище
-        stepTwoStore.updateTable("kkt", {
-          rows: tablesData.kkt.rows,
-          withVAT: tablesData.kkt.totals.withVAT,
-          VAT: tablesData.kkt.totals.VAT,
-        });
-        stepTwoStore.updateTable("cashKkt", {
-          rows: tablesData.cashKkt.rows,
-          withVAT: tablesData.cashKkt.totals.withVAT,
-          VAT: tablesData.cashKkt.totals.VAT,
-        });
-        stepTwoStore.updateTable("nonCash", {
-          rows: tablesData.nonCash.rows,
-          withVAT: tablesData.nonCash.totals.withVAT,
-          VAT: tablesData.nonCash.totals.VAT,
-        });
-        stepTwoStore.updateTable("otherSum", {
-          rows: tablesData.otherSum.rows,
-          withVAT: tablesData.otherSum.totals.withVAT,
-          VAT: tablesData.otherSum.totals.VAT,
-        });
-      }
-    } catch (error) {
-      console.error("Ошибка при сохранении черновика:", error);
-    } finally {
-      isSaving.value = false;
-    }
-  };
+  const { isSaving, saveReport, updateStores } = useSaveReport({
+    kktTableRef,
+    cashKktTableRef,
+    nonCashTableRef,
+    otherSumTableRef,
+    stepOneStore,
+    stepTwoStore,
+    loadReport,
+  });
 
   const validateAndNext = () => {
-    const tablesData = {
-      kkt: kktTableRef.value?.getTableData() || {
-        rows: [],
-        totals: { withVAT: 0, VAT: 0 },
-      },
-      cashKkt: cashKktTableRef.value?.getTableData() || {
-        rows: [],
-        totals: { withVAT: 0, VAT: 0 },
-      },
-      nonCash: nonCashTableRef.value?.getTableData() || {
-        rows: [],
-        totals: { withVAT: 0, VAT: 0 },
-      },
-      otherSum: otherSumTableRef.value?.getTableData() || {
-        rows: [],
-        totals: { withVAT: 0, VAT: 0 },
-      },
-    };
-
-    const validateTablesData = (data) => {
-      if (data.kkt.rows.length === 0) {
-        console.error("Таблица ККТ не может быть пустой");
-        return false;
-      }
-
-      return true;
-    };
-
-    if (!validateTablesData(tablesData)) {
-      console.error("Ошибка валидации данных");
-      // Здесь можно добавить UI-уведомление об ошибке
+    if (!isFormValid.value) {
+      console.error("Ошибка валидации данных:", validationError.value);
       return;
     }
 
-    try {
-      // Сохраняем данные в хранилище перед переходом
-      stepTwoStore.updateTable("kkt", {
-        rows: tablesData.kkt.rows,
-        withVAT: tablesData.kkt.totals.withVAT,
-        VAT: tablesData.kkt.totals.VAT,
-      });
-      stepTwoStore.updateTable("cashKkt", {
-        rows: tablesData.cashKkt.rows,
-        withVAT: tablesData.cashKkt.totals.withVAT,
-        VAT: tablesData.cashKkt.totals.VAT,
-      });
-      stepTwoStore.updateTable("nonCash", {
-        rows: tablesData.nonCash.rows,
-        withVAT: tablesData.nonCash.totals.withVAT,
-        VAT: tablesData.nonCash.totals.VAT,
-      });
-      stepTwoStore.updateTable("otherSum", {
-        rows: tablesData.otherSum.rows,
-        withVAT: tablesData.otherSum.totals.withVAT,
-        VAT: tablesData.otherSum.totals.VAT,
-      });
+    const tablesData = {
+      kkt: kktTableRef.value?.getTableData(),
+      cashKkt: cashKktTableRef.value?.getTableData(),
+      nonCash: nonCashTableRef.value?.getTableData(),
+      otherSum: otherSumTableRef.value?.getTableData(),
+    };
 
-      console.log("Данные успешно сохранены в хранилище");
-      navigateTo("/record/3");
-    } catch (error) {
-      console.error("Ошибка при сохранении данных:", error);
+    updateStores(tablesData);
+    navigateTo("/record/3");
+  };
+
+  const saveData = async () => {
+    const saved = await saveReport("Draft");
+    if (saved) {
+      const tablesData = {
+        kkt: kktTableRef.value?.getTableData(),
+        cashKkt: cashKktTableRef.value?.getTableData(),
+        nonCash: nonCashTableRef.value?.getTableData(),
+        otherSum: otherSumTableRef.value?.getTableData(),
+      };
+      updateStores(tablesData);
     }
   };
 
   onMounted(async () => {
     try {
       await loadReport("/tenants/reports/-1");
-
       await nextTick();
 
-      // Загружаем данные из хранилища, если они есть
       if (stepTwoStore.kkt.rows.length > 0) {
         kktTableRef.value?.setData?.(stepTwoStore.kkt.rows);
       } else if (tableKkt.value?.body?.length > 0) {
@@ -242,7 +128,6 @@
 </script>
 
 <template>
-  <!-- Остальная часть шаблона остается без изменений -->
   <div>
     <StepsCoreHeader
       step-title="Суммы, подлежащие включению в размер Денежного оборота в Помещении"
@@ -251,6 +136,7 @@
     />
 
     <StepsCoreMain>
+      <!-- Таблицы остаются без изменений -->
       <section :class="$style.wrapper">
         <StepsCoreContentTitle
           text="2.1 Денежный оборот, полученный при расчетах с использованием ККТ, установленных в Помещении"
@@ -317,17 +203,27 @@
         <UButton class="steps-nav-btn ghost" @click="handleBack">Назад</UButton>
       </template>
       <template #action>
-        <UButton
-          class="steps-nav-btn ghost"
-          :loading="isSaving"
-          @click="saveData"
-          >Сохранить как черновик
-        </UButton>
+        <UTooltip :text="!isFormValid ? validationError : ''">
+          <UButton
+            class="steps-nav-btn ghost"
+            :loading="isSaving"
+            :disabled="!isFormValid"
+            @click="saveData"
+          >
+            Сохранить как черновик
+          </UButton>
+        </UTooltip>
       </template>
       <template #next>
-        <UButton class="steps-nav-btn solid" @click="validateAndNext"
-          >Далее
-        </UButton>
+        <UTooltip :text="!isFormValid ? validationError : ''">
+          <UButton
+            class="steps-nav-btn solid"
+            :disabled="!isFormValid"
+            @click="validateAndNext"
+          >
+            Далее
+          </UButton>
+        </UTooltip>
       </template>
     </StepsCoreNavigation>
   </div>

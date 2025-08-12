@@ -160,7 +160,7 @@
 
   .button {
     padding: 5px 10px;
-    background-color: var(--a-bgAccent);
+    background-color: var(--a-bgAccentLight);
     color: var(--a-mainText);
     border-radius: rem(4);
     cursor: pointer;
@@ -177,6 +177,7 @@
     }
 
     &.required {
+      background-color: var(--a-bgGrayLight);
       border-color: var(--a-errorText);
       animation: pulse 1.5s infinite;
     }

@@ -92,8 +92,8 @@
   const createEmptyRow = (): NonCashTableRow => ({
     id: "",
     name: "",
-    amount_with_nds: "",
-    amount_nds: "",
+    amount_with_nds: "0",
+    amount_nds: "0",
     file_ids: [],
     files: [],
     isNew: true,
@@ -289,6 +289,7 @@
           :max-files="3"
           :files="row.files || []"
           :file-ids="row.file_ids || []"
+          :is-required="true"
           @files-uploaded="
             ({ filesData }) => handleFileUploaded({ index, filesData })
           "
