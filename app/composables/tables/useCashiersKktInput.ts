@@ -5,10 +5,10 @@ export const useCashiersKktInput = (
   const localValue = ref(initialValue);
   const isInvalid = ref(false);
 
-  const validateRegistrationNumber = (event: Event) => {
+  const validateRegistrationNumber = (event: Event): string => {
     if (isFromApi) {
       event.preventDefault();
-      return;
+      return localValue.value;
     }
 
     const input = event.target as HTMLInputElement;
@@ -21,6 +21,8 @@ export const useCashiersKktInput = (
     localValue.value = value;
     input.value = value;
     isInvalid.value = value.length > 0 && value.length !== 16;
+
+    return value; // Возвращаем очищенное значение
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {

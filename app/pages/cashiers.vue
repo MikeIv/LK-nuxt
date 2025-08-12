@@ -1,26 +1,40 @@
 <script setup lang="ts">
+  interface Cashier {
+    id?: string | null;
+    name: string;
+    registration_number: string;
+    serial_number: string;
+    fn_number: string;
+    registered_at: Date | string | null;
+    installed_at: Date | string | null;
+    order: number;
+    isDirty?: boolean;
+    isCustom?: boolean;
+  }
+
   const {
     callApi: loadKktData,
     data: kktData,
     isLoading: kktLoading,
-  } = useApi<UserData>();
+  } = useApi<Cashier[]>();
 
-  console.log("loadKktData", loadKktData);
-  console.log("kktData", kktData);
+  const { callApi: saveKktData, isLoading: isSaving } = useApi<{
+    success: boolean;
+    message: string;
+  }>();
 
-  const allTables = ref<unknown[]>([]);
-
+  const allTables = ref<Cashier[]>([]);
   const saveMessage = ref("");
   const isError = ref(false);
-  const isSaving = ref(false);
   const invalidFields = ref<Record<string, boolean>>({});
 
+  // Добавление новой кассы
   const addBlock = () => {
     const blockNumber = allTables.value.length + 1;
     const name = `Касса ${blockNumber}`;
 
     allTables.value.push({
-      name: name,
+      name,
       registration_number: "",
       serial_number: "",
       fn_number: "",
@@ -32,9 +46,14 @@
     });
 
     showMessage("Добавлен новый блок");
+    nextTick(() => {
+      const tables = document.querySelectorAll(".table");
+      tables[tables.length - 1]?.scrollIntoView({ behavior: "smooth" });
+    });
   };
 
-  const removeBlock = (block: unknown) => {
+  // Удаление кассы
+  const removeBlock = (block: Cashier) => {
     if (!confirm("Вы уверены, что хотите удалить эту кассу?")) return;
 
     const index = allTables.value.findIndex(
@@ -45,17 +64,21 @@
 
     if (index !== -1) {
       allTables.value.splice(index, 1);
-      showMessage("Блок удален");
+      showMessage("Касса удалена");
     }
   };
+
+  // Валидация перед сохранением
   const validateBeforeSave = () => {
     invalidFields.value = {};
+    let isValid = true;
 
     allTables.value.forEach((block, index) => {
       if (!block.isDirty && !block.isCustom) return;
 
       if (!block.name?.trim()) {
         invalidFields.value[`name-${index}`] = true;
+        isValid = false;
       }
 
       if (
@@ -63,63 +86,96 @@
         (!block.registration_number || block.registration_number.length !== 16)
       ) {
         invalidFields.value[`regNum-${index}`] = true;
+        isValid = false;
       }
 
       if (!block.serial_number?.trim()) {
         invalidFields.value[`serialNum-${index}`] = true;
+        isValid = false;
       }
 
       if (!block.fn_number?.trim()) {
         invalidFields.value[`fnNum-${index}`] = true;
+        isValid = false;
       }
 
       if (!block.registered_at) {
         invalidFields.value[`regDate-${index}`] = true;
+        isValid = false;
       }
+
       if (!block.installed_at) {
         invalidFields.value[`instDate-${index}`] = true;
+        isValid = false;
       }
     });
 
-    return Object.keys(invalidFields.value).length === 0;
+    return isValid;
   };
 
+  // Сохранение данных
   const saveData = async () => {
+    if (isSaving.value) return;
     if (!validateBeforeSave()) {
       showMessage("Заполните все обязательные поля", true);
       return;
     }
 
-    isSaving.value = true;
     try {
-      const cashersStore = useCashersStore();
+      // Подготавливаем данные в нужном формате
+      const formattedData = {
+        kkts: allTables.value.map((table) => ({
+          id: table.id || null,
+          name: table.name,
+          registration_number: table.registration_number,
+          serial_number: table.serial_number,
+          fn_number: table.fn_number,
+          registered_at: formatDateForApi(table.registered_at),
+          installed_at: formatDateForApi(table.installed_at),
+        })),
+      };
 
-      const cashersToSave = allTables.value.map((table) => ({
-        id: table.id || null,
-        name: table.name,
-        registration_number: table.registration_number,
-        serial_number: table.serial_number,
-        fn_number: table.fn_number,
-        registered_at: table.registered_at,
-        installed_at: table.installed_at,
-        order: table.order,
-        isCustom: table.isCustom || false,
-        isDirty: false,
-      }));
+      // Вспомогательная функция для форматирования даты
+      function formatDateForApi(date: Date | string | null): string | null {
+        if (!date) return null;
 
-      cashersStore.loadFromApi(cashersToSave);
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return null;
 
-      allTables.value.forEach((table) => {
-        table.isDirty = false;
-        table.isCustom = false;
+        return d.toISOString().split("T")[0]; // Формат YYYY-MM-DD
+      }
+
+      const response = await saveKktData("/tenants/kkts", {
+        method: "POST",
+        body: formattedData,
       });
 
-      showMessage("Данные успешно сохранены");
+      if (response?.success) {
+        // Обновляем состояние после успешного сохранения
+        allTables.value = allTables.value.map((table) => ({
+          ...table,
+          isDirty: false,
+          isCustom: false,
+        }));
+
+        // Перезагружаем данные с сервера
+        await loadKktData("/v1/tenants/kkts");
+        if (kktData.value) {
+          allTables.value = kktData.value.map((table, index) => ({
+            ...table,
+            order: index + 1,
+            isDirty: false,
+            isCustom: false,
+          }));
+        }
+
+        showMessage(response.message || "Данные успешно сохранены");
+      } else {
+        showMessage(response?.message || "Ошибка при сохранении", true);
+      }
     } catch (err) {
-      showMessage("Ошибка при сохранении", true);
       console.error("Ошибка сохранения:", err);
-    } finally {
-      isSaving.value = false;
+      showMessage("Ошибка при сохранении данных", true);
     }
   };
 
@@ -133,25 +189,45 @@
       return;
     }
 
-    isSaving.value = true;
     try {
-      allTables.value = allTables.value.filter((table) => !table.isCustom);
-
-      allTables.value.forEach((table) => {
-        table.isDirty = false;
-      });
-
+      await loadKktData("/tenants/kkts");
+      if (kktData.value) {
+        allTables.value = kktData.value.map((table) => ({
+          ...table,
+          isDirty: false,
+          isCustom: false,
+        }));
+      }
       showMessage("Изменения отменены");
     } catch (err) {
       console.error("Ошибка при отмене изменений:", err);
       showMessage("Ошибка при отмене изменений", true);
-    } finally {
-      isSaving.value = false;
     }
   };
 
+  const hasEmptyFields = computed(() => {
+    return allTables.value.some((table) => {
+      if (!table.isDirty && !table.isCustom) return false;
+
+      const requiredFieldsValid =
+        table.name?.trim() &&
+        table.serial_number?.trim() &&
+        table.fn_number?.trim() &&
+        table.registered_at &&
+        table.installed_at;
+
+      if (table.isCustom) {
+        return !(
+          requiredFieldsValid && table.registration_number?.length === 16
+        );
+      }
+
+      return !requiredFieldsValid;
+    });
+  });
+
   const hasChanges = computed(() => {
-    return allTables.value.some((block) => block.isDirty || block.isCustom);
+    return allTables.value.some((table) => table.isDirty || table.isCustom);
   });
 
   const showMessage = (message: string, error = false) => {
@@ -159,27 +235,21 @@
     isError.value = error;
     setTimeout(() => {
       saveMessage.value = "";
-    }, 13000);
+    }, 5000);
   };
-
-  watch(
-    allTables,
-    (newVal) => {
-      console.log("All tables updated:", newVal);
-    },
-    { deep: true },
-  );
 
   onMounted(async () => {
     try {
       await loadKktData("/tenants/kkts");
-      const cashersStore = useCashersStore();
-
-      cashersStore.loadFromApi(kktData.value);
-
-      allTables.value = [...cashersStore.allCashers];
+      if (kktData.value) {
+        allTables.value = kktData.value.map((table) => ({
+          ...table,
+          isDirty: false,
+          isCustom: false,
+        }));
+      }
     } catch (err) {
-      console.log(err);
+      console.error("Ошибка загрузки данных:", err);
       showMessage("Ошибка при загрузке данных ККТ", true);
     }
   });
@@ -191,6 +261,7 @@
       main-title="Мои кассы"
       step-title="Добавляйте и редактируйте информацию о Ваших кассах"
     />
+
     <section :class="cashes.content">
       <div v-if="kktLoading">Загрузка данных...</div>
 
@@ -204,7 +275,6 @@
             :invalid-fields="invalidFields"
             :is-from-api="!!block.id"
             @remove-block="removeBlock"
-            @update:invalid-fields="invalidFields = $event"
           />
         </section>
       </template>
@@ -220,12 +290,19 @@
       <div :class="cashes.row">
         <button
           :class="[cashes.btn, cashes.btnGhost]"
-          :disabled="!hasChanges || isSaving"
+          :disabled="!hasChanges || isSaving || hasEmptyFields"
+          :title="
+            !hasChanges
+              ? 'Нет изменений для сохранения'
+              : hasEmptyFields
+                ? 'Заполните все обязательные поля'
+                : 'Сохранить изменения'
+          "
           @click="saveData"
         >
-          <span :class="cashes.btnTitle">{{
-            isSaving ? "Сохранение..." : "Сохранить"
-          }}</span>
+          <span :class="cashes.btnTitle">
+            {{ isSaving ? "Сохранение..." : "Сохранить" }}
+          </span>
         </button>
 
         <button
@@ -233,18 +310,20 @@
           :disabled="!hasChanges || isSaving"
           @click="updateData"
         >
-          <span class="record__btn-title">{{
-            isSaving ? "Отмена..." : "Отменить"
-          }}</span>
+          <span :class="cashes.btnTitle">
+            {{ isSaving ? "Отмена..." : "Отменить" }}
+          </span>
         </button>
 
         <transition name="fade">
           <div
             v-if="saveMessage"
-            class="record__flag-message"
-            :class="[{ error: isError }, cashes.flagMessage]"
+            :class="[cashes.flagMessage, { error: isError }]"
           >
             {{ saveMessage }}
+            <span v-if="hasEmptyFields && isError">
+              (Проверьте все кассы с изменениями)
+            </span>
           </div>
         </transition>
       </div>
@@ -272,6 +351,7 @@
     position: relative;
     display: flex;
     gap: 1.125rem;
+    align-items: center;
   }
   .actions {
     display: flex;
@@ -292,6 +372,11 @@
     border-radius: 0.25rem;
     transition: background-color 0.3s;
     cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   }
 
   .btnAction {
@@ -320,5 +405,9 @@
     background-color: var(--a-bgGreen);
     border-radius: rem(4);
     z-index: 2;
+
+    &.error {
+      background-color: var(--a-bgError);
+    }
   }
 </style>

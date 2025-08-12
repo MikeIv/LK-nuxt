@@ -15,6 +15,7 @@
     registered_at: Date | null;
     installed_at: Date | null;
     isDirty?: boolean;
+    isCustom?: boolean;
   }
 
   interface Props {
@@ -41,10 +42,9 @@
     isInvalid,
     validateRegistrationNumber,
     handleKeyDown,
-    inputClasses,
   } = useCashiersKktInput(
     props.block.registration_number || "",
-    isFromApi.value,
+    props.isFromApi,
   );
 
   const {
@@ -52,10 +52,38 @@
     titleInput,
     startTitleEditing,
     handleTitleEditEnd,
-    validateDigitsInput,
-    handleDateChange,
     emitRemoveBlock,
   } = useCashiersTableMethods(localBlock, emit, index);
+
+  const validateDigitsInput = (e: Event, field: string) => {
+    const input = e.target as HTMLInputElement;
+    const value = input.value.replace(/\D/g, "");
+    localBlock.value = {
+      ...localBlock.value,
+      [field]: value,
+      isDirty: true,
+    };
+    emit("update:block", { ...localBlock.value });
+  };
+
+  const handleDateChange = (field: string, date: Date | null) => {
+    localBlock.value = {
+      ...localBlock.value,
+      [field]: date,
+      isDirty: true,
+    };
+    emit("update:block", { ...localBlock.value });
+  };
+
+  const handleRegNumberInput = (event: Event) => {
+    const cleanValue = validateRegistrationNumber(event);
+    localBlock.value = {
+      ...localBlock.value,
+      registration_number: cleanValue,
+      isDirty: true,
+    };
+    emit("update:block", { ...localBlock.value });
+  };
 
   watch(
     () => props.block,
@@ -67,7 +95,7 @@
 </script>
 
 <template>
-  <div :class="cashes.table">
+  <div :class="[cashes.table, localBlock.isCustom && cashes.tableNew]">
     <div :class="cashes.titleWrapper">
       <input
         v-if="editingTitle"
@@ -75,8 +103,9 @@
         v-model="localBlock.name"
         :class="[
           {
-            'cashes.editing': editingTitle,
-            'error-field': invalidFields[`name-${index}`],
+            'error-field':
+              (localBlock.isCustom || localBlock.isDirty) &&
+              (!localBlock.name?.trim() || invalidFields[`name-${index}`]),
           },
           cashes.titleInput,
         ]"
@@ -119,13 +148,22 @@
         <template v-else>
           <input
             :value="registrationNumber"
-            :class="[inputClasses, cashes.input]"
+            :class="[
+              {
+                'error-field':
+                  (localBlock.isCustom || localBlock.isDirty) &&
+                  (!localBlock.registration_number ||
+                    localBlock.registration_number.length !== 16 ||
+                    invalidFields[`regNum-${index}`]),
+              },
+              cashes.input,
+            ]"
             type="text"
             placeholder="Введите 16 цифр"
             maxlength="16"
             inputmode="numeric"
             pattern="\d{16}"
-            @input="validateRegistrationNumber($event)"
+            @input="handleRegNumberInput($event)"
             @keydown="handleKeyDown"
           />
           <small v-if="isInvalid" :class="cashes.errorKkt">
@@ -141,8 +179,9 @@
           :class="[
             {
               'error-field':
-                invalidFields[`serialNum-${index}`] &&
-                !localBlock.serial_number?.trim(),
+                (localBlock.isCustom || localBlock.isDirty) &&
+                (!localBlock.serial_number?.trim() ||
+                  invalidFields[`serialNum-${index}`]),
             },
             cashes.input,
           ]"
@@ -150,7 +189,7 @@
           placeholder="Введите номер"
           inputmode="numeric"
           pattern="[0-9]*"
-          @input="validateDigitsInput($event, 'serial_number')"
+          @input="(e) => validateDigitsInput(e, 'serial_number')"
         />
       </div>
 
@@ -161,8 +200,9 @@
           :class="[
             {
               'error-field':
-                invalidFields[`fnNum-${index}`] &&
-                !localBlock.fn_number?.trim(),
+                (localBlock.isCustom || localBlock.isDirty) &&
+                (!localBlock.fn_number?.trim() ||
+                  invalidFields[`fnNum-${index}`]),
             },
             cashes.input,
           ]"
@@ -170,7 +210,7 @@
           placeholder="Введите номер"
           inputmode="numeric"
           pattern="[0-9]*"
-          @input="validateDigitsInput($event, 'fn_number')"
+          @input="(e) => validateDigitsInput(e, 'fn_number')"
         />
       </div>
 
@@ -185,7 +225,8 @@
           cancel-text="Отмена"
           select-text="Выбрать"
           :input-class-name="
-            invalidFields[`regDate-${index}`]
+            (localBlock.isCustom || localBlock.isDirty) &&
+            !localBlock.registered_at
               ? 'custom-datepicker-input error-field'
               : 'custom-datepicker-input'
           "
@@ -209,7 +250,8 @@
           cancel-text="Отмена"
           select-text="Выбрать"
           :input-class-name="
-            invalidFields[`instDate-${index}`]
+            (localBlock.isCustom || localBlock.isDirty) &&
+            !localBlock.installed_at
               ? 'custom-datepicker-input error-field'
               : 'custom-datepicker-input'
           "
@@ -239,12 +281,18 @@
     border-radius: rem(12);
     margin-bottom: rem(20);
     transition: all 0.3s ease;
-    -webkit-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    -moz-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 
     &:last-child {
       margin-bottom: 0;
+    }
+  }
+
+  .table-new {
+    border: 1px solid var(--a-error-light);
+
+    .titleText {
+      color: var(--a-error);
     }
   }
 
@@ -423,7 +471,8 @@
 
 <style lang="scss">
   .error-field {
-    border-color: var(--a-error);
+    border-color: var(--a-error) !important;
+    box-shadow: 0 0 0 1px var(--a-error);
   }
 
   .cashes-picker {
