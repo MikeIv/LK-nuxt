@@ -1,14 +1,20 @@
 <script setup lang="ts">
   import { useStepOneStore } from "~/stores/stepOne";
   import { formatDate } from "~/utils/date";
+  import { usePeriodCheck } from "~/composables/usePeriodCheck";
 
   const stepOne = useStepOneStore();
+
+  const dateRangeRef = computed(() => stepOne.dateRange);
+
+  const { isCheckingPeriod, periodExists } = usePeriodCheck(dateRangeRef);
 
   const isFormValid = computed(() => {
     return (
       stepOne.dateRange?.length === 2 &&
       stepOne.visitorsCount !== null &&
-      stepOne.checksCount !== null
+      stepOne.checksCount !== null &&
+      !periodExists.value
     );
   });
 
@@ -43,6 +49,7 @@
           <div v-if="stepOne.dateRange?.length === 2" :class="$style.dates">
             Выбран период: {{ formatDate(stepOne.dateRange[0]) }} -
             {{ formatDate(stepOne.dateRange[1]) }}
+            <span v-if="isCheckingPeriod">(Проверка...)</span>
           </div>
         </div>
 
@@ -91,6 +98,9 @@
         >
           Далее
         </UButton>
+        <span v-if="periodExists" :class="$style.errorText">
+          Такой отчет уже существует. Поменяйте дату.
+        </span>
       </template>
     </StepsCoreNavigation>
   </div>
@@ -136,5 +146,16 @@
     font-weight: 600;
     background-color: var(--a-mainBg);
     border-radius: 0.25rem;
+  }
+
+  .errorText {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: rem(4) rem(12);
+    font-size: rem(12);
+    font-weight: 500;
+    color: var(--a-lightText);
+    background-color: var(--a-bgWarning);
   }
 </style>
