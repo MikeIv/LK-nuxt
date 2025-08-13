@@ -18,23 +18,24 @@
     isLoading: kktLoading,
   } = useApi<Cashier[]>();
 
-  const { callApi: saveKktData, isLoading: isSaving } = useApi<{
-    success: boolean;
-    message: string;
-  }>();
+  const {
+    callApi: saveKktData,
+    isLoading: isSaving,
+    fullResponse: saveResponse,
+  } = useApi();
 
   const allTables = ref<Cashier[]>([]);
   const saveMessage = ref("");
   const isError = ref(false);
   const invalidFields = ref<Record<string, boolean>>({});
 
-  // Добавление новой кассы
   const addBlock = () => {
     const blockNumber = allTables.value.length + 1;
     const name = `Касса ${blockNumber}`;
 
     allTables.value.push({
       name,
+      _originalName: name,
       registration_number: "",
       serial_number: "",
       fn_number: "",
@@ -52,7 +53,6 @@
     });
   };
 
-  // Удаление кассы
   const removeBlock = (block: Cashier) => {
     if (!confirm("Вы уверены, что хотите удалить эту кассу?")) return;
 
@@ -63,12 +63,19 @@
     );
 
     if (index !== -1) {
+      if (block.id) {
+        allTables.value.forEach((t) => (t.isDirty = true));
+      }
+
       allTables.value.splice(index, 1);
       showMessage("Касса удалена");
+
+      allTables.value.forEach((table, idx) => {
+        table.order = idx + 1;
+      });
     }
   };
 
-  // Валидация перед сохранением
   const validateBeforeSave = () => {
     invalidFields.value = {};
     let isValid = true;
@@ -113,7 +120,6 @@
     return isValid;
   };
 
-  // Сохранение данных
   const saveData = async () => {
     if (isSaving.value) return;
     if (!validateBeforeSave()) {
@@ -122,7 +128,6 @@
     }
 
     try {
-      // Подготавливаем данные в нужном формате
       const formattedData = {
         kkts: allTables.value.map((table) => ({
           id: table.id || null,
@@ -135,43 +140,39 @@
         })),
       };
 
-      // Вспомогательная функция для форматирования даты
       function formatDateForApi(date: Date | string | null): string | null {
         if (!date) return null;
-
         const d = new Date(date);
-        if (isNaN(d.getTime())) return null;
-
-        return d.toISOString().split("T")[0]; // Формат YYYY-MM-DD
+        return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
       }
 
-      const response = await saveKktData("/tenants/kkts", {
+      await saveKktData("/tenants/kkts", {
         method: "POST",
         body: formattedData,
       });
 
-      if (response?.success) {
-        // Обновляем состояние после успешного сохранения
-        allTables.value = allTables.value.map((table) => ({
+      if (!saveResponse.value || saveResponse.value.success !== true) {
+        const errorMsg = saveResponse.value?.message || "Ошибка при сохранении";
+        showMessage(errorMsg, true);
+        return;
+      }
+
+      allTables.value = allTables.value.map((table) => ({
+        ...table,
+        isDirty: false,
+        isCustom: false,
+      }));
+
+      showMessage(saveResponse.value.message || "Данные успешно сохранены");
+
+      await loadKktData("/tenants/kkts");
+      if (kktData.value) {
+        allTables.value = kktData.value.map((table, index) => ({
           ...table,
+          order: index + 1,
           isDirty: false,
           isCustom: false,
         }));
-
-        // Перезагружаем данные с сервера
-        await loadKktData("/v1/tenants/kkts");
-        if (kktData.value) {
-          allTables.value = kktData.value.map((table, index) => ({
-            ...table,
-            order: index + 1,
-            isDirty: false,
-            isCustom: false,
-          }));
-        }
-
-        showMessage(response.message || "Данные успешно сохранены");
-      } else {
-        showMessage(response?.message || "Ошибка при сохранении", true);
       }
     } catch (err) {
       console.error("Ошибка сохранения:", err);
@@ -227,6 +228,10 @@
   });
 
   const hasChanges = computed(() => {
+    if (kktData.value && allTables.value.length !== kktData.value.length) {
+      return true;
+    }
+
     return allTables.value.some((table) => table.isDirty || table.isCustom);
   });
 
@@ -235,7 +240,7 @@
     isError.value = error;
     setTimeout(() => {
       saveMessage.value = "";
-    }, 5000);
+    }, 15000);
   };
 
   onMounted(async () => {
@@ -244,6 +249,7 @@
       if (kktData.value) {
         allTables.value = kktData.value.map((table) => ({
           ...table,
+          _originalName: table.name,
           isDirty: false,
           isCustom: false,
         }));
@@ -345,6 +351,37 @@
     display: flex;
     flex-direction: column;
     margin-bottom: rem(40);
+    max-height: rem(470);
+    overflow: auto;
+    padding-right: rem(8);
+
+    &::-webkit-scrollbar {
+      width: rem(8);
+      height: rem(8);
+    }
+
+    &::-webkit-scrollbar-track {
+      background: var(--a-bgLight); // Цвет трека
+      border-radius: rem(4);
+      margin: rem(4) 0;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--a-borderAccent);
+      border-radius: rem(4);
+      transition: background 0.3s ease;
+
+      &:hover {
+        background: var(--a-mainBg);
+      }
+    }
+
+    /* Стили для Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: var(--a-borderAccent) var(--a-bgLight);
+
+    /* Стили для IE/Edge */
+    -ms-overflow-style: -ms-autohiding-scrollbar;
   }
 
   .row {
@@ -352,6 +389,7 @@
     display: flex;
     gap: 1.125rem;
     align-items: center;
+    margin-bottom: rem(24);
   }
   .actions {
     display: flex;
@@ -364,7 +402,6 @@
     align-items: center;
     width: max-content;
     flex-shrink: 0;
-    margin-bottom: 1.25rem;
     padding: rem(4) rem(12);
     font-size: 0.875rem;
     font-weight: 600;
@@ -380,7 +417,11 @@
   }
 
   .btnAction {
-    color: var(--a-white);
+    color: var(--a-mainText);
+
+    &:hover {
+      background-color: var(--a-bgAccentDark);
+    }
   }
 
   .btnGhost {

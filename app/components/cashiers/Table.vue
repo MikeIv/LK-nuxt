@@ -16,6 +16,7 @@
     installed_at: Date | null;
     isDirty?: boolean;
     isCustom?: boolean;
+    _originalName?: string;
   }
 
   interface Props {
@@ -34,6 +35,7 @@
 
   const localBlock = ref<Block>({ ...props.block });
   const index = ref(props.index);
+  const regNumberInput = ref<HTMLInputElement | null>(null);
 
   const isFromApi = computed(() => props.isFromApi);
 
@@ -85,6 +87,13 @@
     emit("update:block", { ...localBlock.value });
   };
 
+  const getDatePickerClasses = (field: "registered_at" | "installed_at") => {
+    const hasError =
+      (localBlock.value.isCustom || localBlock.value.isDirty) &&
+      !localBlock.value[field];
+    return hasError ? "error-field" : "";
+  };
+
   watch(
     () => props.block,
     (newVal) => {
@@ -92,6 +101,14 @@
     },
     { deep: true },
   );
+
+  onMounted(() => {
+    if (props.block.isCustom) {
+      nextTick(() => {
+        regNumberInput.value?.focus();
+      });
+    }
+  });
 </script>
 
 <template>
@@ -147,6 +164,7 @@
         </template>
         <template v-else>
           <input
+            ref="regNumberInput"
             :value="registrationNumber"
             :class="[
               {
@@ -224,15 +242,9 @@
           :max-date="new Date()"
           cancel-text="Отмена"
           select-text="Выбрать"
-          :input-class-name="
-            (localBlock.isCustom || localBlock.isDirty) &&
-            !localBlock.registered_at
-              ? 'custom-datepicker-input error-field'
-              : 'custom-datepicker-input'
-          "
           placeholder="Выберите дату"
           class="cashes-picker"
-          :class="cashes.inputDate"
+          :class="[cashes.inputDate, getDatePickerClasses('registered_at')]"
           @update:model-value="
             (date) => handleDateChange('registered_at', date)
           "
@@ -249,15 +261,9 @@
           :max-date="new Date()"
           cancel-text="Отмена"
           select-text="Выбрать"
-          :input-class-name="
-            (localBlock.isCustom || localBlock.isDirty) &&
-            !localBlock.installed_at
-              ? 'custom-datepicker-input error-field'
-              : 'custom-datepicker-input'
-          "
           placeholder="Выберите дату"
           class="cashes-picker"
-          :class="cashes.inputDate"
+          :class="[cashes.inputDate, getDatePickerClasses('installed_at')]"
           @update:model-value="(date) => handleDateChange('installed_at', date)"
         />
       </div>
@@ -275,7 +281,7 @@
     display: flex;
     flex-direction: column;
     max-width: rem(1000);
-    min-height: rem(80);
+    min-height: rem(154);
     padding: rem(12) rem(24);
     background-color: var(--a-bgTable);
     border-radius: rem(12);
@@ -413,13 +419,13 @@
     background-color: var(--a-mainBg);
     border-radius: rem(4);
     box-sizing: border-box;
-    cursor: none;
+    cursor: pointer;
   }
 
   .errorKkt {
     color: var(--a-errorText);
     font-size: 0.625rem;
-    margin-top: 4px;
+    margin-top: rem(-6);
   }
 
   .input {
@@ -466,16 +472,32 @@
     display: flex;
     margin-right: rem(20);
     font-size: rem(12);
+
+    &.error-field {
+      border-color: var(--a-borderError);
+
+      .dp__input {
+        border-color: var(--a-borderError);
+      }
+    }
   }
 </style>
 
 <style lang="scss">
   .error-field {
-    border-color: var(--a-error) !important;
-    box-shadow: 0 0 0 1px var(--a-error);
+    border-color: var(--a-borderError);
+
+    & .dp__input {
+      border-color: var(--a-borderError);
+    }
   }
 
   .cashes-picker {
+    &.dp__main.error-field {
+      & .dp__input {
+        border-color: var(--a-borderError);
+      }
+    }
     .dp__input_wrap {
       .dp__input {
         width: rem(170);
@@ -488,6 +510,11 @@
         &:focus {
           outline: none;
           border-color: var(--a-primary);
+        }
+
+        &::placeholder {
+          font-family: "Montserrat", sans-serif;
+          color: var(--a-mainTexPlaceholder);
         }
       }
 

@@ -1,11 +1,22 @@
-// types/api.ts
-export type ApiResponse<T> = {
+type ApiResponsePayload<T = unknown> = T;
+
+type ApiResponse<T = unknown> = {
   success: boolean;
   message?: string;
-  payload?: T;
+  payload?: ApiResponsePayload<T>;
 };
 
-export type LaravelPaginatedResponse<T> = {
+type PaginationMeta = {
+  current_page: number;
+  from: number;
+  last_page: number;
+  path: string;
+  per_page: number;
+  to: number;
+  total: number;
+};
+
+type LaravelPaginatedResponse<T = unknown> = {
   data: T[];
   links: {
     first: string;
@@ -13,51 +24,62 @@ export type LaravelPaginatedResponse<T> = {
     next: string | null;
     prev: string | null;
   };
-  meta: {
-    current_page: number;
-    from: number;
-    last_page: number;
-    path: string;
-    per_page: number;
-    to: number;
-    total: number;
-  };
+  meta: PaginationMeta;
 };
 
-export type ApiOptions<T = unknown> = {
-  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  body?: T;
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+type ResponseType = "json" | "blob";
+
+type ApiOptions<D = unknown> = {
+  method?: HttpMethod;
+  body?: D;
   headers?: Record<string, string>;
   params?: Record<string, unknown>;
-  responseType?: "json" | "blob";
+  responseType?: ResponseType;
 };
 
-// composables/useApi.ts
-export const useApi = <T>() => {
+export const useApi = <T = unknown>() => {
   const config = useRuntimeConfig();
-  const API_BASE_URL = config.public.apiBase;
   const authStore = useAuthStore();
 
-  const data = ref<T | null>(null);
-  const error = ref<string | null>(null);
-  const isLoading = ref(false);
-  const pagination = ref<LaravelPaginatedResponse<T>["meta"] | null>(null);
+  const data: Ref<T | null> = ref(null);
+  const fullResponse: Ref<ApiResponse<T> | LaravelPaginatedResponse<T> | null> =
+    ref(null);
+  const error: Ref<string | null> = ref(null);
+  const isLoading: Ref<boolean> = ref(false);
+  const pagination: Ref<PaginationMeta | null> = ref(null);
+
+  const isApiResponse = (response: unknown): response is ApiResponse<T> => {
+    return (
+      typeof response === "object" && response !== null && "success" in response
+    );
+  };
+
+  const isLaravelPaginatedResponse = (
+    response: unknown,
+  ): response is LaravelPaginatedResponse<T> => {
+    return (
+      typeof response === "object" &&
+      response !== null &&
+      "data" in response &&
+      "meta" in response
+    );
+  };
 
   const callApi = async <D = unknown>(
     endpoint: string,
     options: ApiOptions<D> = { method: "GET", responseType: "json" },
-  ): Promise<T | Blob | null> => {
+  ): Promise<ApiResponse<T> | LaravelPaginatedResponse<T> | Blob | null> => {
     const fullUrl = endpoint.startsWith("http")
       ? endpoint
-      : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+      : `${config.public.apiBase}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
     isLoading.value = true;
     error.value = null;
-    pagination.value = null;
 
     try {
       const headers: Record<string, string> = {
-        ...(options.responseType === "json" && { Accept: "application/json" }),
+        Accept: "application/json",
         ...(authStore.token && { Authorization: `Bearer ${authStore.token}` }),
         ...options.headers,
       };
@@ -67,71 +89,67 @@ export const useApi = <T>() => {
       }
 
       const response = await $fetch<
-        ApiResponse<T> | LaravelPaginatedResponse<T> | Blob | T
+        ApiResponse<T> | LaravelPaginatedResponse<T> | Blob
       >(fullUrl, {
         method: options.method,
         body: options.method !== "GET" ? options.body : undefined,
         params: options.method === "GET" ? options.params : undefined,
         credentials: "include",
         headers,
-        responseType: options.responseType === "blob" ? "blob" : "json",
+        responseType: options.responseType,
       });
 
-      // Обработка Blob (файлов)
+      fullResponse.value = response instanceof Blob ? null : response;
+
       if (response instanceof Blob) {
         return response;
       }
 
-      // Обработка пагинированного ответа Laravel
-      if (
-        typeof response === "object" &&
-        response !== null &&
-        "data" in response &&
-        "meta" in response
-      ) {
+      if (isLaravelPaginatedResponse(response)) {
         data.value = response.data as T;
         pagination.value = response.meta;
-        return response.data as T;
+        return response;
       }
 
-      // Обработка стандартного API ответа ({ success, payload })
-      if (
-        typeof response === "object" &&
-        response !== null &&
-        "success" in response
-      ) {
-        if (response.success) {
-          data.value = response.payload as T;
-          return response.payload as T;
-        } else {
-          throw new Error(response.message || "Request failed");
-        }
+      if (isApiResponse(response)) {
+        data.value = response.payload as T;
+        return response;
       }
 
-      // Обработка прямого ответа (например, просто массив)
       data.value = response as T;
-      return response as T;
+      return {
+        success: true,
+        payload: response,
+      } as ApiResponse<T>;
     } catch (err: unknown) {
-      const errorMessage = err?.message || "Request error";
+      const errorMessage =
+        err instanceof Error ? err.message : "Request failed";
       error.value = errorMessage;
+
       console.error("API call error:", {
         endpoint,
         error: errorMessage,
-        status: err?.status,
+        status: (err as { statusCode?: number })?.statusCode,
       });
 
-      // Авто-обновление токена при 401
-      if (err?.status === 401 && authStore.token) {
+      if (
+        (err as { statusCode?: number })?.statusCode === 401 &&
+        authStore.token
+      ) {
         try {
           await authStore.refreshToken();
           return await callApi(endpoint, options);
         } catch (refreshError) {
           console.error("Token refresh failed:", refreshError);
           await authStore.logOut();
+          navigateTo("/login");
         }
       }
 
-      return null;
+      return {
+        success: false,
+        message: errorMessage,
+      };
     } finally {
       isLoading.value = false;
     }
@@ -139,6 +157,7 @@ export const useApi = <T>() => {
 
   return {
     data,
+    fullResponse,
     error,
     isLoading,
     pagination,

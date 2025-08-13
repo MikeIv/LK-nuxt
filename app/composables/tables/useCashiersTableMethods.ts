@@ -8,7 +8,7 @@ export const useCashiersTableMethods = (block: Ref<unknown>, emit: unknown) => {
       [field]: value,
       isDirty: true,
     };
-    block.value = JSON.parse(JSON.stringify(updatedBlock));
+    block.value = updatedBlock;
     emit("update:block", updatedBlock);
   };
 
@@ -23,20 +23,13 @@ export const useCashiersTableMethods = (block: Ref<unknown>, emit: unknown) => {
   const handleTitleEditEnd = () => {
     if (!block.value.name?.trim()) {
       updateLocalBlock("name", `Касса ${block.value.order}`);
+    } else if (block.value.name !== block.value._originalName) {
+      block.value.isDirty = true;
+      emit("update:block", { ...block.value });
     }
+
     editingTitle.value = false;
   };
-
-  // const validateDigitsInput = (event: Event, field: string) => {
-  //   const input = event.target as HTMLInputElement;
-  //   const value = input.value.replace(/\D/g, "");
-  //   input.value = value;
-  //   updateLocalBlock(field, value);
-  // };
-  //
-  // const handleDateChange = (field: string, date: Date | null) => {
-  //   updateLocalBlock(field, date);
-  // };
 
   const emitRemoveBlock = () => {
     emit("removeBlock", block.value);
