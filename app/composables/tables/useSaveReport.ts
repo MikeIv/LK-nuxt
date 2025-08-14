@@ -58,7 +58,7 @@ export const useSaveReport = ({
           })),
           cash_turnovers_without_kkt: tablesData.cashKkt.rows.map((row) => ({
             name: row.name,
-            settlement_account_number: row.settlement_account_number,
+            settlement_account_number: row.settlement_account_number || "",
             amount_with_nds: parseFloat(row.amount_with_nds) || 0,
             amount_nds: parseFloat(row.amount_nds) || 0,
             file_ids: row.file_ids || [],

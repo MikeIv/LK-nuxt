@@ -34,14 +34,14 @@ export function useSaveFile() {
       });
 
       console.debug("[saveFile] Server response:", response);
+      console.log("RESPONSE", response);
 
       if (!response) {
         console.error("[saveFile] No response received from server");
         throw new Error("No response received from server");
       }
 
-      // Проверяем основные обязательные поля
-      if (!response.id || !response.url) {
+      if (!response.payload.id || !response.payload.url) {
         console.error(
           "[saveFile] Invalid server response - missing required fields",
           response,
@@ -51,13 +51,13 @@ export function useSaveFile() {
 
       console.debug("[saveFile] Upload successful:", file.name);
       return {
-        id: response.id,
-        name: response.name || file.name,
-        url: response.url,
-        mime_type: response.mime_type || file.type,
-        size: response.size || file.size,
-        created_at: response.created_at,
-        updated_at: response.updated_at,
+        id: response.payload.id,
+        name: response.payload.name || file.name,
+        url: response.payload.url,
+        mime_type: response.payload.mime_type || file.type,
+        size: response.payload.size || file.size,
+        created_at: response.payload.created_at,
+        updated_at: response.payload.updated_at,
       };
     } catch (error) {
       console.error("[saveFile] Upload failed:", {

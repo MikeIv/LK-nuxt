@@ -76,6 +76,8 @@
       otherSum: otherSumTableRef.value?.getTableData(),
     };
 
+    console.log("tablesData@@@", tablesData);
+
     updateStores(tablesData);
     navigateTo("/record/3");
   };
@@ -136,7 +138,6 @@
     />
 
     <StepsCoreMain>
-      <!-- Таблицы остаются без изменений -->
       <section :class="$style.wrapper">
         <StepsCoreContentTitle
           text="2.1 Денежный оборот, полученный при расчетах с использованием ККТ, установленных в Помещении"

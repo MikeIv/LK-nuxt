@@ -58,10 +58,10 @@ export const useFormValidation = (
       if (table.rows.length > 0) {
         const invalidRow = table.rows.find(
           (row) =>
-            !row.name ||
+            // !row.name ||
             isNaN(parseFloat(row.amount_with_nds)) ||
-            isNaN(parseFloat(row.amount_nds)) ||
-            (row.file_ids?.length ?? 0) === 0,
+            isNaN(parseFloat(row.amount_nds)),
+          // (row.file_ids?.length ?? 0) === 0,
         );
 
         return invalidRow

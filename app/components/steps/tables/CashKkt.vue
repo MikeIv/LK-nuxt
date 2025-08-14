@@ -34,7 +34,6 @@
     (e: "file-removed", payload: { index: number; fileIndex: number }): void;
   }>();
 
-  // Реактивные данные
   const editableRows = ref<CashTableRow[]>([]);
   const addedRowsIndices = ref<number[]>([]);
   const editingNameIndex = ref<number | null>(null);
@@ -43,10 +42,21 @@
   const showRemoveButton = ref(false);
   const invalidFields = ref<Record<number, string[]>>({});
 
-  // Composable
   const fieldValidations = {
-    amount_with_nds: { required: true, min: 0 },
-    amount_nds: { required: true, min: 0 },
+    amount_with_nds: {
+      required: false,
+      validator: (value: string) => {
+        const num = parseFloat(value.replace(",", "."));
+        return !isNaN(num) && num >= 0;
+      },
+    },
+    amount_nds: {
+      required: false,
+      validator: (value: string) => {
+        const num = parseFloat(value.replace(",", "."));
+        return !isNaN(num) && num >= 0;
+      },
+    },
   } as const;
 
   const numberErrors = ref<Record<number, string>>({});
@@ -70,16 +80,27 @@
     const errors: string[] = [];
     const row = editableRows.value[index];
 
-    if (!row.name?.trim()) errors.push("name");
-    if (!row.settlement_account_number?.trim()) {
-      errors.push("settlement_account_number");
+    const amountWithNds = row.amount_with_nds;
+    const amountNds = row.amount_nds;
+
+    const hasAmountWithNds = amountWithNds && amountWithNds !== "0";
+    const hasAmountNds = amountNds && amountNds !== "0";
+
+    if (
+      hasAmountWithNds &&
+      !fieldValidations.amount_with_nds.validator(amountWithNds)
+    ) {
+      errors.push("amount_with_nds");
     }
 
-    const amountWithNdsValid = !shouldShowError(index, "amount_with_nds");
-    const amountNdsValid = !shouldShowError(index, "amount_nds");
+    if (hasAmountNds && !fieldValidations.amount_nds.validator(amountNds)) {
+      errors.push("amount_nds");
+    }
 
-    if (!amountWithNdsValid) errors.push("amount_with_nds");
-    if (!amountNdsValid) errors.push("amount_nds");
+    const hasFileIds = row.file_ids && row.file_ids.length > 0;
+    if ((hasAmountWithNds || hasAmountNds) && !hasFileIds) {
+      errors.push("files");
+    }
 
     invalidFields.value = {
       ...invalidFields.value,
@@ -94,7 +115,6 @@
 
   const { totalWithVAT, totalVAT } = useCashCalculations(editableRows);
 
-  // Методы
   const createEmptyRow = (): CashTableRow => ({
     id: "",
     name: "",
@@ -312,7 +332,7 @@
           :max-files="3"
           :files="row.files || []"
           :file-ids="row.file_ids || []"
-          :is-required="true"
+          :is-required="!!row.settlement_account_number"
           @files-uploaded="
             ({ filesData }) => handleFileUploaded({ index, filesData })
           "
