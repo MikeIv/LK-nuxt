@@ -22,6 +22,14 @@ export const useReportCalculation = () => {
     return reportData.value?.report?.rent_percentage ?? 0;
   });
 
+  const sumWithVAT = computed(() => {
+    return stepTwoStore.totalWithVAT - stepThreeStore.totalWithVAT;
+  });
+
+  const sumWithoutVAT = computed(() => {
+    return stepTwoStore.totalWithoutVAT - stepThreeStore.totalWithoutVAT;
+  });
+
   const percentageWithVAT = computed(() => {
     const total = stepTwoStore.totalWithVAT - stepThreeStore.totalWithVAT;
     return ((total || 0) * (rentPercentage.value || 0)) / 100;
@@ -171,6 +179,8 @@ export const useReportCalculation = () => {
     hasChanges,
     baseComparisonValue,
     isSaving,
+    sumWithVAT,
+    sumWithoutVAT,
     rentPercentage,
     percentageWithVAT,
     percentageWithoutVAT,

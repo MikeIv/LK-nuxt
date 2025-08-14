@@ -10,17 +10,17 @@
     formatCurrency,
     savingReport,
     isSaving,
+    sumWithVAT,
+    sumWithoutVAT,
     baseComparisonValue,
     rentPercentage,
     percentageWithVAT,
     percentageWithoutVAT,
     paymentWithVAT,
     paymentWithoutVAT,
-    tablesStore,
     loadReport,
     isLoading,
     reportData,
-    stepThreeStore,
   } = useReportCalculation();
 
   console.log("loadReport", loadReport);
@@ -39,10 +39,8 @@
     body: [
       {
         name: "Итого Денежный оборот в Помещении",
-        with_nds:
-          tablesStore?.totalWithVAT - stepThreeStore?.totalWithVAT || "0",
-        without_nds:
-          tablesStore?.totalWithoutVAT - stepThreeStore?.totalWithoutVAT || "0",
+        with_nds: sumWithVAT || "0",
+        without_nds: sumWithoutVAT || "0",
       },
       {
         name: "Процент с Денежного оборота, %",
