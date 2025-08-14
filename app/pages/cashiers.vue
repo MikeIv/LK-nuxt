@@ -348,12 +348,13 @@
   }
 
   .section {
+    position: relative;
     display: flex;
     flex-direction: column;
     margin-bottom: rem(40);
-    max-height: rem(470);
-    overflow: auto;
-    padding-right: rem(8);
+    max-height: rem(480);
+    overflow: visible;
+    padding: rem(8);
 
     &::-webkit-scrollbar {
       width: rem(8);
@@ -420,6 +421,7 @@
     color: var(--a-mainText);
 
     &:hover {
+      color: var(--a-lightText);
       background-color: var(--a-bgAccentDark);
     }
   }

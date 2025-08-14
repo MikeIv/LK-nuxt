@@ -10,13 +10,13 @@
   const authStore = useAuthStore();
 
   const userInfo = computed(() => {
+    console.log("USER", userStore.user.value);
+    const user = userStore.user.value;
     if (!userStore.user) return null;
     return [
-      userStore.user.tenant_name,
-      userStore.user.brand,
-      userStore.user.contract_number
-        ? `Договор ${userStore.user.contract_number}`
-        : null,
+      user?.tenant_name,
+      user?.brand,
+      user?.contract_number ? `Договор ${user?.contract_number}` : null,
     ]
       .filter(Boolean)
       .join(", ");
@@ -113,12 +113,7 @@
 
   onMounted(async () => {
     await userStore.fetchUser();
-
-    // Альтернативно: можно загружать напрямую через useApi
-    // await fetchData('/api/user/me');
-    // if (userData.value) {
-    //   userStore.user = userData.value;
-    // }
+    console.log(userStore.user);
   });
 </script>
 
@@ -148,7 +143,6 @@
         />
       </div>
     </div>
-
     <div :class="$style.bottomRow">
       <p v-if="userInfo">{{ userInfo }}</p>
     </div>

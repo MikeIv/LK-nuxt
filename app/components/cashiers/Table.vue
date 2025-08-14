@@ -469,6 +469,7 @@
   }
 
   .inputDate {
+    position: relative;
     display: flex;
     margin-right: rem(20);
     font-size: rem(12);
