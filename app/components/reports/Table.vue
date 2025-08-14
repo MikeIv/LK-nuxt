@@ -5,22 +5,26 @@
     getCoreRowModel,
   } from "@tanstack/vue-table";
 
-  interface Period {
-    start: string;
-    end: string;
+  const $style = useCssModule();
+
+  interface TableHeader {
+    key: string;
+    label: string;
   }
 
   interface Report {
-    can_download_documents: boolean;
-    can_edit: boolean;
-    can_request_correction: boolean;
-    period: Period;
-    status: string;
+    id: number;
+    period: string;
     turnover_amount: number;
     turnover_fee: number;
+    status: string;
+    can_edit: boolean;
+    can_download_documents: boolean;
+    can_request_correction: boolean;
   }
 
   interface Props {
+    headers: TableHeader[];
     reports: Report[];
     pagination?: {
       currentPage: number;
@@ -28,68 +32,119 @@
       perPage: number;
       total: number;
     };
-    onPageChange?: (page: number) => void;
   }
 
   const props = defineProps<Props>();
-
   const emit = defineEmits(["pageChange"]);
 
-  const columns = [
-    {
-      header: "№",
-      cell: ({ row }) => row.index + 1,
-      size: 60,
-    },
-    {
-      accessorKey: "period",
-      header: "Период",
-      cell: ({ row }) => {
-        const start = new Date(row.original.period.start).toLocaleDateString();
-        const end = new Date(row.original.period.end).toLocaleDateString();
-        return `${start} - ${end}`;
-      },
-      size: 200,
-    },
-    {
-      accessorKey: "status",
-      header: "Статус",
-      cell: ({ row }) => {
-        const statusMap: Record<string, string> = {
-          CorrectionRequested: "Запрошено исправление",
-          Submitted: "Сформирован",
-          // другие статусы
-        };
-        return statusMap[row.original.status] || row.original.status;
-      },
-      size: 180,
-    },
-    {
-      accessorKey: "turnover_amount",
-      header: "Сумма оборота",
-      cell: ({ row }) => row.original.turnover_amount.toLocaleString() + " ₽",
-      size: 150,
-    },
-    {
-      accessorKey: "turnover_fee",
-      header: "Комиссия",
-      cell: ({ row }) => row.original.turnover_fee.toLocaleString() + " ₽",
-      size: 150,
-    },
-    {
-      header: "Действия",
-      cell: ({ row }) => {
-        return row.original.can_download_documents
-          ? '<button class="download-btn">Скачать</button>'
-          : "Недоступно";
-      },
-      size: 120,
-    },
-  ];
+  const columns = computed(() => {
+    return props.headers.map((header) => {
+      const baseColumn = {
+        accessorKey: header.key,
+        header: header.label,
+        size: 150,
+      };
+
+      // Специальные обработчики для определенных полей
+      switch (header.key) {
+        case "id":
+          return {
+            ...baseColumn,
+            size: 60,
+            cell: ({ row }) => {
+              const number = row.index + 1;
+              return number < 10 ? `0${number}` : number;
+            },
+          };
+        case "period":
+          return {
+            ...baseColumn,
+            size: 200,
+            cell: ({ row }) => {
+              const [start, end] = row.original.period.split(" - ");
+              const startDate = new Date(start).toLocaleDateString();
+              const endDate = new Date(end).toLocaleDateString();
+              return `${startDate} - ${endDate}`;
+            },
+          };
+        case "status":
+          return {
+            ...baseColumn,
+            size: 180,
+            cell: ({ row }) => {
+              const statusMap: Record<string, string> = {
+                CorrectionRequested: "Запрошено исправление",
+                Submitted: "Сформирован",
+              };
+              return statusMap[row.original.status] || row.original.status;
+            },
+          };
+        case "turnover_amount":
+        case "turnover_fee":
+          return {
+            ...baseColumn,
+            cell: ({ row }) => row.original[header.key].toLocaleString() + " ₽",
+          };
+        case "can_edit":
+          return {
+            ...baseColumn,
+            size: 120,
+            cell: ({ row }) => {
+              if (!row.original.can_edit) return null;
+              return h(
+                "button",
+                {
+                  class: $style.editButton,
+                  onClick: (e) => {
+                    e.stopPropagation();
+                    // Здесь будет переход на страницу редактирования
+                    navigateTo(`/reports/edit/${row.original.id}`);
+                  },
+                },
+                [h(IconEdit, { class: $style.editIcon })],
+              );
+            },
+          };
+        case "can_download_documents":
+          return {
+            ...baseColumn,
+            cell: ({ row }) => {
+              return row.original.can_download_documents
+                ? '<button class="download-btn">Скачать</button>'
+                : "";
+            },
+          };
+
+        case "can_request_correction":
+          return {
+            ...baseColumn,
+            size: 150,
+            cell: ({ row }) => {
+              if (!row.original.can_request_correction) return null;
+
+              return h(
+                "button",
+                {
+                  class: $style.requestButton,
+                  onClick: async (e) => {
+                    console.log(e);
+                    // ... обработчик клика
+                  },
+                },
+                "Запросить",
+              );
+            },
+          };
+
+        default:
+          return baseColumn;
+      }
+    });
+  });
 
   const table = useVueTable({
     data: props.reports,
-    columns,
+    columns: columns.value,
     getCoreRowModel: getCoreRowModel(),
   });
 
@@ -98,15 +153,12 @@
     const { currentPage, lastPage } = props.pagination;
     const range = [];
 
-    // Всегда показываем первую страницу
     range.push(1);
 
-    // Показываем точки, если текущая страница далеко от первой
     if (currentPage > 3) {
       range.push("...");
     }
 
-    // Показываем страницы вокруг текущей
     for (
       let i = Math.max(2, currentPage - 1);
       i <= Math.min(lastPage - 1, currentPage + 1);
@@ -115,12 +167,10 @@
       range.push(i);
     }
 
-    // Показываем точки, если текущая страница далеко от последней
     if (currentPage < lastPage - 2) {
       range.push("...");
     }
 
-    // Всегда показываем последнюю страницу, если она не первая
     if (lastPage > 1) {
       range.push(lastPage);
     }
@@ -226,6 +276,34 @@
     flex: 1;
     overflow: auto;
     position: relative;
+
+    &::-webkit-scrollbar {
+      width: rem(8);
+      height: rem(8);
+    }
+
+    &::-webkit-scrollbar-track {
+      background: var(--a-bgLight); // Цвет трека
+      border-radius: rem(4);
+      margin: rem(4) 0;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--a-borderAccent);
+      border-radius: rem(4);
+      transition: background 0.3s ease;
+
+      &:hover {
+        background: var(--a-mainBg);
+      }
+    }
+
+    /* Стили для Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: var(--a-borderAccent) var(--a-bgLight);
+
+    /* Стили для IE/Edge */
+    -ms-overflow-style: -ms-autohiding-scrollbar;
   }
 
   .reportsTable {
@@ -238,29 +316,49 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    background-color: #f8fafc;
+    background-color: var(--a-bgAccentExLight);
 
     th {
-      padding: 12px 16px;
-      text-align: left;
-      border-bottom: 1px solid #e2e8f0;
-      font-weight: 600;
-      color: #64748b;
       position: sticky;
       top: 0;
-      background-color: inherit;
+      padding: rem(12) rem(14);
+      text-align: center;
+      font-size: rem(12);
+      font-weight: 600;
+      line-height: 1.2;
+      color: var(--a-mainText);
+      border-bottom: 1px solid var(--a-borderAccent);
+      border-right: 1px solid var(--a-borderLght);
+
+      &:last-child {
+        border-right: none;
+      }
     }
   }
 
   .tableBody {
-    tr:hover {
-      background-color: #f8fafc;
+    tr {
+      background-color: var(--a-bgLight);
+
+      &:hover {
+        background-color: var(--a-bgTableLight);
+        cursor: pointer;
+      }
     }
 
     td {
-      padding: 12px 16px;
-      border-bottom: 1px solid #e2e8f0;
-      vertical-align: top;
+      padding: rem(12) rem(14);
+      vertical-align: center;
+      text-align: center;
+      font-size: rem(12);
+      font-weight: 600;
+      line-height: 1.2;
+      border-bottom: 1px solid var(--a-bgAccentExLight);
+      border-right: 1px solid var(--a-borderAccentLight);
+
+      &:last-child {
+        border-right: none;
+      }
     }
   }
 
@@ -279,9 +377,13 @@
   }
 
   .pageButton {
-    padding: 8px 12px;
-    border: 1px solid #e2e8f0;
-    background: white;
+    padding: rem(4) rem(8);
+    font-size: rem(12);
+    font-weight: 600;
+    color: var(--a-mainText);
+    line-height: 1.2;
+    border: 1px solid var(--a-borderAccent);
+    background: var(--a-bgAccentExLight);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s;
@@ -292,9 +394,9 @@
     }
 
     &.active {
-      background: #3b82f6;
-      color: white;
-      border-color: #3b82f6;
+      background: var(--a-bgAccent);
+      color: var(--a-mainText);
+      border-color: var(--a-borderAccent);
     }
 
     &.disabled {
@@ -304,7 +406,7 @@
   }
 
   .download-btn {
-    background: #3b82f6;
+    background: var(--a-bgAccentExLight);
     color: white;
     border: none;
     padding: 6px 12px;
@@ -313,7 +415,7 @@
     transition: background 0.2s;
 
     &:hover {
-      background: #2563eb;
+      background: var(--a-bgAccent);
     }
   }
 </style>
