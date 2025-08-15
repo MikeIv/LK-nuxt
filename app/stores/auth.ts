@@ -1,4 +1,3 @@
-// stores/auth.ts
 import { defineStore } from "pinia";
 import { useCookie } from "#app";
 
@@ -24,13 +23,12 @@ export const useAuthStore = defineStore("auth", () => {
   const setToken = (newToken: string) => {
     token.value = newToken;
     const cookie = useCookie("token", {
-      maxAge: 60 * 30, // 30 минут (как access token)
+      maxAge: 60 * 60, // 60 минут (как access token)
       secure: true,
       sameSite: "strict",
     });
     cookie.value = newToken;
 
-    // Запланировать обновление токена за 1 минуту до истечения срока
     scheduleTokenRefresh(120 * 60 * 1000); // 120 минут
   };
 
@@ -43,7 +41,6 @@ export const useAuthStore = defineStore("auth", () => {
     }
   };
 
-  // Запланировать обновление токена
   const scheduleTokenRefresh = (delay: number) => {
     if (refreshTimeout.value) {
       clearTimeout(refreshTimeout.value);
@@ -117,7 +114,6 @@ export const useAuthStore = defineStore("auth", () => {
     }
   };
 
-  // Инициализация при загрузке хранилища
   const init = () => {
     const savedToken = useCookie("token").value;
     if (savedToken) {

@@ -58,12 +58,12 @@
       useToast().add({
         title: "Ошибка выхода",
         description: "Не удалось завершить сеанс",
-        color: "red",
-        icon: "i-heroicons-exclamation-triangle",
+        color: "primary",
+        icon: "i-heroicons-x-circle",
         ui: {
-          background: "bg-red-50 dark:bg-red-900/50",
-          title: "text-red-800 dark:text-red-100",
-          description: "text-red-700 dark:text-red-200",
+          wrapper: "",
+          title: "text-[#292d3e]",
+          description: "text-[#e37508]",
         },
       });
     } finally {

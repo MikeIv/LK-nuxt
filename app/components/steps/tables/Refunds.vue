@@ -1,12 +1,15 @@
 <script setup lang="ts">
-  import type { RefundsTableRow } from "~/types/tables";
+  import type { RefundsTableRow, FileData } from "~/types/tables";
   import { useKktInput } from "~/composables/tables/useKktInput";
   import { useNumberFields } from "~/composables/tables/useNumberFields";
   import { useRefundsCalculations } from "~/composables/tables/useRefundsCalculations";
+  import { useSaveFile } from "~/composables/useSaveFile";
+  import { useFileHandling } from "~/composables/useFileHandling";
 
   interface RefundsTableProps {
     headers?: unknown[];
     initialData?: RefundsTableRow[];
+    initialAddedRowsIndices?: number[];
     loading?: boolean;
     error?: string | boolean;
   }
@@ -14,6 +17,7 @@
   const props = withDefaults(defineProps<RefundsTableProps>(), {
     headers: () => [],
     initialData: () => [],
+    initialAddedRowsIndices: () => [],
     loading: false,
     error: false,
   });
@@ -27,48 +31,108 @@
     (e: "rows-removed", index: number): void;
     (
       e: "files-uploaded",
-      payload: { index: number; filesData: FileData },
+      payload: {
+        index: number;
+        filesData: FileData[];
+      },
     ): void;
-    (e: "file-removed", payload: { index: number }): void;
+    (
+      e: "file-removed",
+      payload: {
+        index: number;
+        fileIndex: number;
+      },
+    ): void;
   }>();
 
-  // Реактивные данные
-  const editableRows = ref<RefundsTableRow[]>([]);
-  const addedRowsIndices = ref<number[]>([]);
-  const editingNameIndex = ref<number | null>(null);
-  const nameInputRefs = ref<HTMLInputElement[]>([]);
-  const tableMessage = ref("");
-  const showRemoveButton = ref(false);
-  const invalidFields = ref<Record<number, string[]>>({});
-  const kktErrors = ref<Record<number, string>>({});
+  const state = reactive({
+    editableRows: [...props.initialData] as RefundsTableRow[],
+    kktErrors: {} as Record<number, string>,
+    numberErrors: {} as Record<number, string>,
+    addedRowsCount: 0,
+    addedRowsIndices: [] as number[],
+    tableMessage: "",
+  });
 
-  // Composable
-  const fieldValidations = {
-    returns_goods_services_with_nds: { required: true, min: 0 },
-    returns_goods_services_nds: { required: true, min: 0 },
-    gift_certificates_sold_with_nds: { required: true, min: 0 },
-    gift_certificates_sold_nds: { required: true, min: 0 },
-  } as const;
+  const {
+    editableRows,
+    kktErrors,
+    numberErrors,
+    addedRowsCount,
+    addedRowsIndices,
+    tableMessage,
+  } = toRefs(state);
 
-  const numberErrors = ref<Record<number, string>>({});
-
-  const { handleNumberInput, handleNumberBlur, shouldShowError } =
-    useNumberFields(editableRows, numberErrors, fieldValidations, (index) => {
-      validateRow(index);
-      emitUpdate();
-    });
   const { loading: fileLoading } = useSaveFile();
-  const { handleFileUploaded, handleFileRemoved } =
-    useFileHandling<RefundsTableRow>({
-      editableRows,
-      emit,
-      getFileId: (row) => row.file_id,
-      setFileData: (row, fileData) => ({
-        ...row,
-        file: fileData ? { ...fileData } : undefined,
-        file_id: fileData ? Number(fileData.id) : null,
-      }),
-    });
+
+  if (editableRows.value.length === 0) {
+    editableRows.value.push(createEmptyRow());
+  }
+
+  function createEmptyRow(): RefundsTableRow {
+    return {
+      id: "",
+      name: "",
+      registration_number: "",
+      returns_goods_services_with_nds: "",
+      returns_goods_services_nds: "",
+      gift_certificates_sold_with_nds: "",
+      gift_certificates_sold_nds: "",
+      file_ids: [],
+      files: [],
+    };
+  }
+
+  const addRow = (): void => {
+    const newRow = createEmptyRow();
+    newRow.name = `Основание ${editableRows.value.length + 1}`;
+    editableRows.value.push(newRow);
+    addedRowsIndices.value.push(editableRows.value.length - 1);
+    addedRowsCount.value++;
+    tableMessage.value = "Добавлено основание";
+    emit("rows-added", [...addedRowsIndices.value]);
+  };
+
+  const removeLastRow = (): void => {
+    if (editableRows.value.length > 1 && addedRowsIndices.value.length > 0) {
+      const lastAddedIndex = addedRowsIndices.value.pop();
+      if (lastAddedIndex !== undefined) {
+        editableRows.value.splice(lastAddedIndex, 1);
+        addedRowsIndices.value = addedRowsIndices.value.map((i) =>
+          i > lastAddedIndex ? i - 1 : i,
+        );
+        emit("rows-removed", lastAddedIndex);
+      }
+      addedRowsCount.value--;
+      tableMessage.value = "Основание удалено";
+    }
+  };
+
+  const { totalWithVAT, totalVAT } = useRefundsCalculations(editableRows);
+
+  watch(
+    () => props.initialData,
+    (newData) => {
+      if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
+        editableRows.value = newData?.length
+          ? newData.map((row, index) => ({
+              ...createEmptyRow(),
+              ...row,
+              name: row.name || `Основание ${index + 1}`,
+              returns_goods_services_with_nds:
+                row.returns_goods_services_with_nds || "",
+              returns_goods_services_nds: row.returns_goods_services_nds || "",
+              gift_certificates_sold_with_nds:
+                row.gift_certificates_sold_with_nds || "",
+              gift_certificates_sold_nds: row.gift_certificates_sold_nds || "",
+            }))
+          : [createEmptyRow()];
+
+        addedRowsIndices.value = props.initialAddedRowsIndices || [];
+      }
+    },
+    { immediate: true },
+  );
 
   const {
     handleKktInput,
@@ -76,145 +140,37 @@
     shouldShowError: shouldShowErrorKkt,
   } = useKktInput(editableRows, kktErrors, emit);
 
-  const validateRow = (index: number) => {
-    const errors: string[] = [];
-    const row = editableRows.value[index];
+  const fieldValidations = {
+    returns_goods_services_with_nds: { required: true, min: 0 },
+    returns_goods_services_nds: { required: true, min: 0 },
+    gift_certificates_sold_with_nds: { required: true, min: 0 },
+    gift_certificates_sold_nds: { required: true, min: 0 },
+  } as const;
 
-    if (!row.name?.trim()) errors.push("name");
-    if (shouldShowErrorKkt(index)) errors.push("registration_number");
+  const { handleNumberInput, handleNumberBlur, shouldShowError } =
+    useNumberFields(editableRows, numberErrors, fieldValidations);
 
-    const fieldsToValidate = [
-      "returns_goods_services_with_nds",
-      "returns_goods_services_nds",
-      "gift_certificates_sold_with_nds",
-      "gift_certificates_sold_nds",
-    ];
-
-    fieldsToValidate.forEach((field) => {
-      if (shouldShowError(index, field)) errors.push(field);
+  const { handleFileUploaded, handleFileRemoved } =
+    useFileHandling<RefundsTableRow>({
+      editableRows,
+      emit,
+      getFileIds: (row) => row.file_ids,
+      setFileData: (row, fileData) => ({
+        ...row,
+        files: fileData,
+        file_ids: fileData.map((file) => Number(file.id)),
+      }),
     });
 
-    invalidFields.value = {
-      ...invalidFields.value,
-      [index]: errors,
-    };
-
-    return errors.length === 0;
-  };
-
-  const { totalWithVAT, totalVAT } = useRefundsCalculations(editableRows);
-
-  // Методы
-  const createEmptyRow = (): RefundsTableRow => ({
-    id: "",
-    name: "",
-    registration_number: "",
-    returns_goods_services_with_nds: "",
-    returns_goods_services_nds: "",
-    gift_certificates_sold_with_nds: "",
-    gift_certificates_sold_nds: "",
-    file_id: null,
-    file: undefined,
-    isNew: true,
-  });
-
-  const normalizeRowData = (row: RefundsTableRow): RefundsTableRow => ({
-    ...createEmptyRow(),
-    ...row,
-    isNew: false,
-  });
-
-  const emitUpdate = () => {
-    emit("update:tableData", [...editableRows.value]);
-    emit("update:totalSumm", Number(totalWithVAT.value));
-    emit("update:totalVAT", Number(totalVAT.value));
-  };
-
-  const addRow = async () => {
-    const newRow = createEmptyRow();
-    editableRows.value.push(newRow);
-    const newIndex = editableRows.value.length - 1;
-    addedRowsIndices.value.push(newIndex);
-    showRemoveButton.value = true;
-
-    editingNameIndex.value = newIndex;
-    await nextTick();
-    nameInputRefs.value[newIndex]?.focus();
-
-    tableMessage.value = "Основание добавлено";
-    emitUpdate();
-    emit("rows-added", [newIndex]);
-  };
-
-  const removeLastRow = () => {
-    if (
-      editableRows.value.length === 0 ||
-      addedRowsIndices.value.length === 0
-    ) {
-      showRemoveButton.value = false;
-      return;
-    }
-
-    const currentIndices = [...addedRowsIndices.value];
-    const lastAddedIndex = currentIndices[currentIndices.length - 1];
-
-    editableRows.value.splice(lastAddedIndex, 1);
-
-    const { [lastAddedIndex]: _, ...rest } = invalidFields.value;
-    invalidFields.value = rest;
-
-    addedRowsIndices.value = currentIndices
-      .filter((index) => index !== lastAddedIndex)
-      .map((index) => (index > lastAddedIndex ? index - 1 : index));
-
-    showRemoveButton.value = addedRowsIndices.value.length > 0;
-    tableMessage.value = "Основание удалено";
-    emitUpdate();
-    emit("rows-removed", lastAddedIndex);
-  };
-
-  const handleNameChange = (index: number, event: Event) => {
-    const target = event.target as HTMLInputElement;
-    editableRows.value[index].name = target.value;
-    validateRow(index);
-  };
-
-  const finishNameEditing = (index: number) => {
-    editingNameIndex.value = null;
-    validateRow(index);
-  };
-
-  // Watchers
-  watch(
-    () => props.initialData,
-    (newData) => {
-      if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
-        editableRows.value = newData?.length
-          ? newData.map(normalizeRowData)
-          : [createEmptyRow()];
-        addedRowsIndices.value = [];
-        invalidFields.value = {};
-        showRemoveButton.value = false;
-      }
+  const getTableData = () => ({
+    rows: [...editableRows.value],
+    totals: {
+      withVAT: Number(totalWithVAT.value),
+      VAT: Number(totalVAT.value),
     },
-    { immediate: true },
-  );
+  });
 
-  // watch(totalWithVAT, () => emitUpdate());
-  // watch(totalVAT, () => emitUpdate());
-
-  const getTableData = () => {
-    console.log("Getting table data:", editableRows.value);
-    return {
-      rows: [...editableRows.value],
-      totals: {
-        withVAT: parseFloat(totalWithVAT.value.toFixed(2)),
-        VAT: parseFloat(totalVAT.value.toFixed(2)),
-      },
-    };
-  };
-
-  const setData = (newData: KktTableRow[]) => {
+  const setData = (newData: RefundsTableRow[]) => {
     editableRows.value = [...newData];
   };
 
@@ -222,20 +178,6 @@
     getTableData,
     setData,
   });
-
-  watch(
-    [totalWithVAT, totalVAT],
-    () => {
-      console.log(
-        "Totals updated - with VAT:",
-        totalWithVAT.value,
-        "VAT:",
-        totalVAT.value,
-      );
-      emitUpdate();
-    },
-    { deep: true },
-  );
 </script>
 
 <template>
@@ -247,7 +189,8 @@
     :loading="loading"
     :error="error"
     :message="tableMessage"
-    :show-remove-button="showRemoveButton"
+    add-button-text="Добавить основание"
+    remove-button-text="Отменить добавление"
     is-table
     @add="addRow"
     @remove="removeLastRow"
@@ -258,27 +201,8 @@
       </div>
 
       <div class="cell body-cell">
-        <template v-if="row.isNew || editingNameIndex === index">
-          <input
-            :ref="(el) => (nameInputRefs[index] = el as HTMLInputElement)"
-            type="text"
-            :value="row.name"
-            placeholder="Введите название"
-            class="name-input"
-            :class="[
-              'name-input',
-              { [$style.errorInput]: invalidFields[index]?.includes('name') },
-            ]"
-            @input="handleNameChange(index, $event)"
-            @blur="finishNameEditing(index)"
-            @keyup.enter="finishNameEditing(index)"
-          />
-        </template>
-        <template v-else>
-          <span :class="$style.editable" @click="editingNameIndex = index">
-            {{ row?.name }}
-          </span>
-        </template>
+        <span v-if="row.name">{{ row.name }}</span>
+        <span v-else>Основание {{ index + 1 }}</span>
       </div>
 
       <div class="cell body-cell">
@@ -291,19 +215,12 @@
           required
           :class="[
             $style.inputField,
-            {
-              [$style.errorInput]: invalidFields[index]?.includes(
-                'registration_number',
-              ),
-            },
+            { [$style.errorInput]: shouldShowErrorKkt(index) },
           ]"
           @input="handleKktInput($event, index)"
           @blur="validateKktNumber(index)"
         />
-        <div
-          v-if="invalidFields[index]?.includes('registration_number')"
-          :class="$style.errorMessage"
-        >
+        <div v-if="shouldShowErrorKkt(index)" :class="$style.errorMessage">
           {{ kktErrors[index] }}
         </div>
       </div>
@@ -419,15 +336,20 @@
 
       <div class="cell body-cell">
         <StepsCoreFileUploader
-          :file="row.file"
-          :file-id="row.file_id"
           :index="index"
           prefix="refunds-file"
           :loading="fileLoading"
-          @file-uploaded="
-            ({ fileData }) => handleFileUploaded({ index, filesData: fileData })
+          :multiple="true"
+          :max-files="10"
+          :files="row.files || []"
+          :file-ids="row.file_ids || []"
+          :is-required="true"
+          @files-uploaded="
+            ({ filesData }) => handleFileUploaded({ index, filesData })
           "
-          @file-removed="() => handleFileRemoved({ index })"
+          @file-removed="
+            ({ fileIndex }) => handleFileRemoved({ index, fileIndex })
+          "
         />
       </div>
     </template>
@@ -456,10 +378,6 @@
 
   .centre {
     align-items: center;
-  }
-
-  .editable {
-    cursor: pointer;
   }
 
   .inputField {

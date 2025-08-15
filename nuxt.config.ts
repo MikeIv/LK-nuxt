@@ -195,7 +195,7 @@ export default defineNuxtConfig({
           style: {
             background: "#991b1b",
             color: "#fff",
-            borderLeft: "4px solid #dc2626",
+            borderLeft: "4px solid #b19364",
           },
         },
       },

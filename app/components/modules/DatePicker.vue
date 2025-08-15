@@ -73,8 +73,10 @@
       background-color: var(--a-mainBg);
 
       &:hover {
+        background-color: var(--a-bgAccentExLight);
         border-color: var(--a-borderAccent);
         outline: none;
+        transition: all 0.4s ease-in-out;
       }
 
       &::placeholder {
@@ -100,6 +102,12 @@
 
     .dp__range_end {
       background-color: var(--a-bgAccentDark);
+    }
+
+    .dp__icon {
+      &:hover {
+        fill: var(--a-bgWarning);
+      }
     }
 
     .dp__action_buttons {

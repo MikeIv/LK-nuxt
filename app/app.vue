@@ -1,5 +1,5 @@
 <template>
-  <UApp>
+  <UApp :toaster="toaster">
     <NuxtLayout>
       <!-- Индикатор загрузки между страницами -->
       <!--      <NuxtLoadingIndicator :color="'#00dc82'" :height="3" />-->
@@ -29,6 +29,8 @@
       class: "min-h-screen bg-gray-50",
     },
   });
+
+  const toaster = { duration: 7000 };
 </script>
 
 <style>

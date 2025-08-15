@@ -29,7 +29,7 @@ ul {
 }
 
 .bg-default {
-  background-color: transparent !important;
+  background-color: transparent;
 }
 
 .rounded-md {
@@ -38,8 +38,8 @@ ul {
 }
 
 .ring {
-  border: none !important;
-  box-shadow: none !important;
+  border: none;
+  box-shadow: none;
 }
 
 .steps-nav-btn {
@@ -97,4 +97,9 @@ ul {
 .cell {
   display: flex;
   padding: rem(8);
+}
+
+// Toast
+.bg-toast {
+  background-color: var(--a-bgAccentExLight);
 }
