@@ -352,9 +352,9 @@
     display: flex;
     flex-direction: column;
     margin-bottom: rem(40);
-    max-height: rem(480);
-    overflow: visible;
-    padding: rem(8);
+    height: rem(480);
+    overflow: auto;
+    padding: rem(12) rem(8);
 
     &::-webkit-scrollbar {
       width: rem(8);
@@ -362,7 +362,7 @@
     }
 
     &::-webkit-scrollbar-track {
-      background: var(--a-bgLight); // Цвет трека
+      background: var(--a-bgLight);
       border-radius: rem(4);
       margin: rem(4) 0;
     }
