@@ -3,7 +3,13 @@
     useVueTable,
     FlexRender,
     getCoreRowModel,
+    getSortedRowModel,
+    type SortingState,
   } from "@tanstack/vue-table";
+  import IconEdit from "~/assets/icons/edit-icon.svg";
+  import IconSort from "~/assets/icons/sort-alt.svg";
+  import IconSortAsc from "~/assets/icons/sort-up.svg";
+  import IconSortDesc from "~/assets/icons/sort-down.svg";
 
   const $style = useCssModule();
 
@@ -35,7 +41,7 @@
   }
 
   const props = defineProps<Props>();
-  const emit = defineEmits(["pageChange"]);
+  const emit = defineEmits(["pageChange", "sortChange"]);
 
   const columns = computed(() => {
     return props.headers.map((header) => {
@@ -43,6 +49,12 @@
         accessorKey: header.key,
         header: header.label,
         size: 150,
+        enableSorting: [
+          "period",
+          "turnover_amount",
+          "turnover_fee",
+          "status",
+        ].includes(header.key),
       };
 
       // Специальные обработчики для определенных полей
@@ -109,9 +121,18 @@
           return {
             ...baseColumn,
             cell: ({ row }) => {
-              return row.original.can_download_documents
-                ? '<button class="download-btn">Скачать</button>'
-                : "";
+              if (!row.original.can_download_documents) return null;
+              return h(
+                "button",
+                {
+                  class: $style.downloadButton,
+                  onClick: (e) => {
+                    e.stopPropagation();
+                    // Здесь будет обработчик скачивания
+                  },
+                },
+                "Скачать",
+              );
             },
           };
 
@@ -142,10 +163,27 @@
     });
   });
 
+  const sorting = ref<SortingState>([]);
+
   const table = useVueTable({
     data: props.reports,
     columns: columns.value,
+    state: {
+      get sorting() {
+        return sorting.value;
+      },
+    },
+
+    onSortingChange: (updater) => {
+      if (typeof updater === "function") {
+        sorting.value = updater(sorting.value);
+      } else {
+        sorting.value = updater;
+      }
+      // Можно добавить здесь вызов API для серверной сортировки
+    },
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
   });
 
   const pageNumbers = computed(() => {
@@ -191,37 +229,65 @@
 
 <template>
   <div :class="$style.tableContainer">
-    <div :class="$style.tableWrapper">
-      <table :class="$style.reportsTable">
-        <thead :class="$style.tableHeader">
-          <tr
-            v-for="headerGroup in table.getHeaderGroups()"
-            :key="headerGroup.id"
-          >
-            <th
-              v-for="header in headerGroup.headers"
-              :key="header.id"
-              :style="{ width: `${header.column.getSize()}px` }"
-            >
-              <FlexRender
-                :render="header.column.columnDef.header"
-                :props="header.getContext()"
-              />
-            </th>
-          </tr>
-        </thead>
-        <tbody :class="$style.tableBody">
-          <tr v-for="row in table.getRowModel().rows" :key="row.id">
-            <td v-for="cell in row.getVisibleCells()" :key="cell.id">
-              <FlexRender
-                :render="cell.column.columnDef.cell"
-                :props="cell.getContext()"
-              />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-if="!headers || !reports" class="text-gray-500">
+      Нет данных для отображения
     </div>
+    <template v-else>
+      <div :class="$style.tableWrapper">
+        <table :class="$style.reportsTable">
+          <thead :class="$style.tableHeader">
+            <tr
+              v-for="headerGroup in table.getHeaderGroups()"
+              :key="headerGroup.id"
+            >
+              <th
+                v-for="header in headerGroup.headers"
+                :key="header.id"
+                :style="{ width: `${header.column.getSize()}px` }"
+                @click="
+                  header.column.getCanSort()
+                    ? header.column.toggleSorting()
+                    : null
+                "
+              >
+                <div :class="$style.headerContent">
+                  <FlexRender
+                    :render="header.column.columnDef.header"
+                    :props="header.getContext()"
+                  />
+                  <span
+                    v-if="header.column.getCanSort()"
+                    :class="$style.sortIcon"
+                  >
+                    <template v-if="header.column.getIsSorted() === false">
+                      <IconSort />
+                    </template>
+                    <template v-else-if="header.column.getIsSorted() === 'asc'">
+                      <IconSortAsc />
+                    </template>
+                    <template
+                      v-else-if="header.column.getIsSorted() === 'desc'"
+                    >
+                      <IconSortDesc />
+                    </template>
+                  </span>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody :class="$style.tableBody">
+            <tr v-for="row in table.getRowModel().rows" :key="row.id">
+              <td v-for="cell in row.getVisibleCells()" :key="cell.id">
+                <FlexRender
+                  :render="cell.column.columnDef.cell"
+                  :props="cell.getContext()"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
 
     <div v-if="pagination" :class="$style.pagination">
       <button
@@ -334,6 +400,24 @@
         border-right: none;
       }
     }
+  }
+
+  .headerContent {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: rem(12);
+    user-select: none;
+  }
+
+  .sortIcon {
+    svg {
+      width: rem(16);
+      height: rem(16);
+    }
+
+    color: var(--a-bgAccentDark);
+    cursor: pointer;
   }
 
   .tableBody {
