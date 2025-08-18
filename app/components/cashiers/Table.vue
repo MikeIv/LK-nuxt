@@ -24,6 +24,7 @@
     invalidFields: Record<string, boolean>;
     index: number;
     isFromApi: boolean;
+    autofocus?: boolean;
   }
 
   const props = defineProps<Props>();
@@ -103,7 +104,7 @@
   );
 
   onMounted(() => {
-    if (props.block.isCustom) {
+    if (props.block.isCustom && props.autofocus) {
       nextTick(() => {
         regNumberInput.value?.focus();
       });
@@ -131,9 +132,9 @@
         @keyup.enter="handleTitleEditEnd"
         @blur="handleTitleEditEnd"
       />
-      <p v-else :class="cashes.titleText">
-        {{ localBlock.name || "Не указано" }}
-      </p>
+      <div v-else :class="cashes.titleText">
+        <span>{{ localBlock.name || "Не указано" }}</span>
+      </div>
 
       <button
         v-if="editingTitle"
@@ -341,6 +342,7 @@
     font-weight: 600;
     line-height: 1.2;
     background-color: var(--a-white);
+    border-radius: rem(4);
   }
 
   .okBtn {

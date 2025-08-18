@@ -240,7 +240,7 @@
     isError.value = error;
     setTimeout(() => {
       saveMessage.value = "";
-    }, 15000);
+    }, 5000);
   };
 
   onMounted(async () => {
@@ -280,6 +280,7 @@
             :index="index"
             :invalid-fields="invalidFields"
             :is-from-api="!!block.id"
+            :autofocus="block.isCustom && allTables.length - 1 === index"
             @remove-block="removeBlock"
           />
         </section>
@@ -339,22 +340,12 @@
 
 <style module="cashes" lang="scss">
   .cashes {
-    background: var(--a-white);
-  }
-
-  .content {
     display: flex;
     flex-direction: column;
-  }
-
-  .section {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    margin-bottom: rem(40);
-    height: rem(480);
-    overflow: auto;
+    height: calc(100vh - 200px);
     padding: rem(12) rem(8);
+    background: var(--a-white);
+    overflow: auto;
 
     &::-webkit-scrollbar {
       width: rem(8);
@@ -383,6 +374,18 @@
 
     /* Стили для IE/Edge */
     -ms-overflow-style: -ms-autohiding-scrollbar;
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .section {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: rem(40);
   }
 
   .row {
@@ -421,8 +424,9 @@
     color: var(--a-mainText);
 
     &:hover {
-      color: var(--a-lightText);
+      color: var(--a-white);
       background-color: var(--a-bgAccentDark);
+      transition: background-color 0.3s;
     }
   }
 
