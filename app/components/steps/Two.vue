@@ -82,6 +82,9 @@
     navigateTo("/record/3");
   };
 
+  const saveSuccess = ref(false);
+  const saveSuccessMessage = ref("");
+
   const saveData = async () => {
     const saved = await saveReport("Draft");
     if (saved) {
@@ -92,6 +95,14 @@
         otherSum: otherSumTableRef.value?.getTableData(),
       };
       updateStores(tablesData);
+
+      saveSuccess.value = true;
+      saveSuccessMessage.value = "Данные успешно сохранены как черновик";
+
+      setTimeout(() => {
+        saveSuccess.value = false;
+        saveSuccessMessage.value = "";
+      }, 3000);
     }
   };
 
@@ -259,6 +270,23 @@
             Далее
           </UButton>
         </UTooltip>
+
+        <transition
+          enter-active-class="transition-opacity duration-300"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="transition-opacity duration-300"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <div
+            v-if="saveSuccess"
+            class="flex items-center text-green-600 text-sm font-medium"
+          >
+            <UIcon name="i-heroicons-check-circle" class="w-5 h-5 mr-1" />
+            {{ saveSuccessMessage }}
+          </div>
+        </transition>
       </template>
     </StepsCoreNavigation>
   </div>

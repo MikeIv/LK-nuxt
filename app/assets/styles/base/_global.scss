@@ -84,6 +84,11 @@ ul {
   &.ghost {
     background-color: var(--a-bgLight);
     border: 1px solid var(--a-borderAccent);
+
+    &:hover {
+      color: var(--a-mainText);
+      background-color: var(--a-accentTextDark);
+    }
   }
 }
 

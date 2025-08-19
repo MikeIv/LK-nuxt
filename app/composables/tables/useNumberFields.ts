@@ -193,10 +193,10 @@ export const useNumberFields = (
     const error = numberErrors.value[index];
     const rules = fieldValidations[field] || {};
 
-    // Показываем ошибку если:
-    // 1. Есть явная ошибка валидации
-    // 2. Поле обязательно и пустое
-    // 3. Для полей счетчиков - специальная ошибка
+    if (error) return true;
+
+    // Если поле обязательно И пустое - показываем ошибку
+    if (rules.required && !value) return true;
     return (
       !!error ||
       (rules.required && !value) ||
