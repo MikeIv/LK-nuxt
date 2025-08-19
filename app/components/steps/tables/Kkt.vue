@@ -12,7 +12,6 @@
     initialAddedRowsIndices?: number[];
     loading?: boolean;
     error?: string | boolean;
-    isFromApi?: boolean;
   }
 
   const props = withDefaults(defineProps<KktTableProps>(), {
@@ -22,7 +21,6 @@
     addedRowsIndices: () => [],
     loading: false,
     error: false,
-    isFromApi: false,
   });
 
   const emit = defineEmits<{
@@ -48,31 +46,14 @@
     ): void;
   }>();
 
-  const state = reactive({
-    editableRows: [...props.initialData] as KktTableRow[],
-    kktErrors: {} as Record<number, string>,
-    numberErrors: {} as Record<number, string>,
-    addedRowsCount: 0,
-    addedRowsIndices: [] as number[],
-    tableMessage: "",
-  });
-
-  const {
-    editableRows,
-    kktErrors,
-    numberErrors,
-    addedRowsCount,
-    addedRowsIndices,
-    tableMessage,
-  } = toRefs(state);
-
+  const editableRows = ref<KktTableRow[]>([]);
+  const kktErrors = ref<Record<number, string>>({});
+  const numberErrors = ref<Record<number, string>>({});
+  const addedRowsIndices = ref<number[]>([]);
+  const tableMessage = ref("");
   const showRemoveButton = ref(false);
 
   const { loading: fileLoading } = useSaveFile();
-
-  if (editableRows.value.length === 0) {
-    editableRows.value.push(createEmptyRow());
-  }
 
   function createEmptyRow(): KktTableRow {
     return {
@@ -90,72 +71,87 @@
     };
   }
 
+  const initializeData = () => {
+    if (props.initialData?.length) {
+      editableRows.value = props.initialData.map((row, index) => ({
+        ...createEmptyRow(),
+        ...row,
+        name: row.name || `Касса${index + 1}`,
+        start_meter_reading: row.start_meter_reading || "",
+        end_meter_reading: row.end_meter_reading || "",
+        amount_without_advance_with_nds:
+          row.amount_without_advance_with_nds || "",
+        amount_without_advance_nds: row.amount_without_advance_nds || "",
+        advance_without_certificates_with_nds:
+          row.advance_without_certificates_with_nds || "",
+        advance_without_certificates_nds:
+          row.advance_without_certificates_nds || "",
+      }));
+    } else {
+      editableRows.value = [createEmptyRow()];
+    }
+
+    addedRowsIndices.value = [...(props.initialAddedRowsIndices || [])];
+    showRemoveButton.value = addedRowsIndices.value.length > 0;
+  };
+
+  onMounted(() => {
+    initializeData();
+  });
+
+  watch(() => props.initialData, initializeData, { deep: true });
+  watch(
+    () => props.initialAddedRowsIndices,
+    (newIndices) => {
+      addedRowsIndices.value = [...(newIndices || [])];
+      showRemoveButton.value = addedRowsIndices.value.length > 0;
+    },
+    { deep: true },
+  );
+
   const addRow = (): void => {
-    showRemoveButton.value = true;
     const newRow = createEmptyRow();
     newRow.name = `Касса${editableRows.value.length + 1}`;
+
+    const newIndex = editableRows.value.length;
     editableRows.value.push(newRow);
-    addedRowsIndices.value.push(editableRows.value.length - 1);
-    addedRowsCount.value++;
+    addedRowsIndices.value.push(newIndex);
+
+    showRemoveButton.value = true;
     tableMessage.value = "Добавлена касса";
     emit("rows-added", [...addedRowsIndices.value]);
 
     nextTick(() => {
-      const lastIndex = editableRows.value.length - 1;
-      registrationNumberInputs.value[lastIndex]?.focus();
+      registrationNumberInputs.value[newIndex]?.focus();
     });
   };
 
   const removeLastRow = (): void => {
-    if (editableRows.value.length > 1 && addedRowsIndices.value.length > 0) {
-      const lastAddedIndex = addedRowsIndices.value.pop();
-      if (lastAddedIndex !== undefined) {
-        showRemoveButton.value = false;
-        editableRows.value.splice(lastAddedIndex, 1);
-        addedRowsIndices.value = addedRowsIndices.value.map((i) =>
-          i > lastAddedIndex ? i - 1 : i,
-        );
-        emit("rows-removed", lastAddedIndex);
-      }
-      addedRowsCount.value--;
+    if (addedRowsIndices.value.length > 0) {
+      // Удаляем последнюю добавленную строку
+      const lastAddedIndex = addedRowsIndices.value.pop()!;
+      editableRows.value.splice(lastAddedIndex, 1);
+
+      // Обновляем индексы оставшихся добавленных строк
+      addedRowsIndices.value = addedRowsIndices.value
+        .filter((index) => index !== lastAddedIndex)
+        .map((index) => (index > lastAddedIndex ? index - 1 : index));
+
+      showRemoveButton.value = addedRowsIndices.value.length > 0;
       tableMessage.value = "Касса удалена";
+      emit("rows-removed", lastAddedIndex);
+      emit("rows-added", [...addedRowsIndices.value]);
     }
   };
 
   const { calculateWithNds, totalWithVAT, totalVAT } =
     useKktCalculations(editableRows);
 
-  watch(
-    () => props.initialData,
-    (newData) => {
-      if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
-        editableRows.value = newData?.length
-          ? newData.map((row, index) => ({
-              ...createEmptyRow(),
-              ...row,
-              name: row.name || `Касса${index + 1}`,
-              start_meter_reading: row.start_meter_reading || "",
-              end_meter_reading: row.end_meter_reading || "",
-              amount_without_advance_with_nds:
-                row.amount_without_advance_with_nds || "",
-              amount_without_advance_nds: row.amount_without_advance_nds || "",
-              advance_without_certificates_with_nds:
-                row.advance_without_certificates_with_nds || "",
-              advance_without_certificates_nds:
-                row.advance_without_certificates_nds || "",
-            }))
-          : [createEmptyRow()];
-
-        addedRowsIndices.value = props.addedRowsIndices || [];
-      }
-    },
-    { immediate: true },
-  );
-
   const {
     handleKktInput,
     validateKktNumber,
     shouldShowError: shouldShowErrorKkt,
+    preventNonNumericInput, // Импортируем новую функцию
   } = useKktInput(editableRows, kktErrors, emit);
 
   const fieldValidations = {
@@ -238,23 +234,29 @@
           placeholder="Ровно 16 цифр"
           maxlength="16"
           inputmode="numeric"
+          pattern="[0-9]*"
           required
-          :readonly="isFromApi"
+          :readonly="!addedRowsIndices.includes(index)"
+          class="kkt-table__input-reg-number"
           :class="[
-            $style.inputField,
             {
               [$style.errorInput]: shouldShowErrorKkt(index),
-              [$style.readonlyField]: isFromApi,
+              [$style.readonlyField]: !addedRowsIndices.includes(index),
             },
             {
               [$style.pulse]:
                 index === editableRows.length - 1 &&
                 !row?.registration_number &&
-                !isFromApi,
+                addedRowsIndices.includes(index),
             },
           ]"
-          @input="!isFromApi && handleKktInput($event, index)"
-          @blur="!isFromApi && validateKktNumber(index)"
+          @input="
+            addedRowsIndices.includes(index) && handleKktInput($event, index)
+          "
+          @blur="addedRowsIndices.includes(index) && validateKktNumber(index)"
+          @keypress="
+            addedRowsIndices.includes(index) && preventNonNumericInput($event)
+          "
         />
         <div v-if="shouldShowErrorKkt(index)" :class="$style.errorMessage">
           {{ kktErrors[index] }}
@@ -426,6 +428,22 @@
   </StepsCoreEditableBlock>
 </template>
 
+<style lang="scss">
+  .kkt-table__input-reg-number {
+    width: 100%;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--a-borderAccentLight);
+    background-color: var(--a-mainBg);
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: var(--a-primary);
+    }
+  }
+</style>
+
 <style module lang="scss">
   .centre {
     align-items: center;
@@ -490,7 +508,7 @@
 
   .readonlyField {
     background-color: var(--a-bgDisabled);
-    cursor: not-allowed;
+    cursor: pointer;
     color: var(--a-textDisabled);
 
     &:focus {

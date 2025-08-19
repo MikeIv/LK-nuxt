@@ -1,19 +1,48 @@
 export const useKktInput = (
   editableRows: Ref<unknown[]>,
   kktErrors: Ref<Record<number, string>>,
-  // emit?: (event: string, ...args: any[]) => void,
 ) => {
   const validateRequired = (value: string): boolean => {
     return value.trim().length >= 0;
   };
 
+  const preventNonNumericInput = (event: KeyboardEvent): boolean => {
+    const allowedKeys = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Home",
+      "End",
+      "Enter",
+    ];
+
+    // Разрешаем служебные клавиши
+    if (allowedKeys.includes(event.key)) {
+      return true;
+    }
+
+    // Разрешаем только цифры (0-9)
+    if (!/^\d$/.test(event.key)) {
+      event.preventDefault();
+      return false;
+    }
+
+    return true;
+  };
+
   const handleKktInput = (event: Event, index: number): void => {
     const target = event.target as HTMLInputElement;
     const cursorPosition = target.selectionStart;
-    const currentValue = editableRows.value[index].registration_number || "";
+
     const cleanedValue = target.value.replace(/\D/g, "").slice(0, 16);
 
-    if (cleanedValue === currentValue) return;
+    const previousValue = editableRows.value[index].registration_number || "";
+
+    if (cleanedValue === previousValue) return;
 
     editableRows.value[index].registration_number = cleanedValue;
 
@@ -32,7 +61,6 @@ export const useKktInput = (
       kktErrors.value[index] = undefined;
     }
 
-    // Валидация при полном вводе
     if (cleanedValue.length === 16) {
       validateKktNumber(index);
     }
@@ -79,5 +107,6 @@ export const useKktInput = (
     handleKktInput,
     validateKktNumber,
     shouldShowError,
+    preventNonNumericInput,
   };
 };
