@@ -95,6 +95,16 @@
     }
   };
 
+  const isDataChanged = ref(false);
+
+  const checkDataChanges = () => {
+    isDataChanged.value = true;
+  };
+
+  const handleTableChange = () => {
+    checkDataChanges();
+  };
+
   onMounted(async () => {
     try {
       await loadReport("/tenants/reports/-1");
@@ -123,9 +133,33 @@
       } else if (tableOtherSum.value?.body?.length > 0) {
         otherSumTableRef.value?.setData?.(tableOtherSum.value.body);
       }
+
+      kktTableRef.value?.$el?.addEventListener("change", handleTableChange);
+      cashKktTableRef.value?.$el?.addEventListener("change", handleTableChange);
+      nonCashTableRef.value?.$el?.addEventListener("change", handleTableChange);
+      otherSumTableRef.value?.$el?.addEventListener(
+        "change",
+        handleTableChange,
+      );
     } catch (error) {
       console.error("Ошибка при загрузке данных:", error);
     }
+  });
+
+  onBeforeUnmount(() => {
+    kktTableRef.value?.$el?.removeEventListener("change", handleTableChange);
+    cashKktTableRef.value?.$el?.removeEventListener(
+      "change",
+      handleTableChange,
+    );
+    nonCashTableRef.value?.$el?.removeEventListener(
+      "change",
+      handleTableChange,
+    );
+    otherSumTableRef.value?.$el?.removeEventListener(
+      "change",
+      handleTableChange,
+    );
   });
 </script>
 
@@ -204,11 +238,11 @@
         <UButton class="steps-nav-btn ghost" @click="handleBack">Назад</UButton>
       </template>
       <template #action>
-        <UTooltip :text="!isFormValid ? validationError : ''">
+        <UTooltip :text="!isFormValid && !isDataChanged ? validationError : ''">
           <UButton
             class="steps-nav-btn ghost"
             :loading="isSaving"
-            :disabled="!isFormValid"
+            :disabled="!isDataChanged && !isFormValid"
             @click="saveData"
           >
             Сохранить как черновик

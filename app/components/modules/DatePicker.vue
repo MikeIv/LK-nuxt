@@ -70,20 +70,32 @@
       font-weight: 600;
       font-family: Montserrat, sans-serif;
       border: none;
-      background-color: var(--a-mainBg);
 
-      &:hover {
-        background-color: var(--a-bgAccentExLight);
+      :hover {
         border-color: var(--a-borderAccent);
         outline: none;
         transition: all 0.4s ease-in-out;
       }
 
-      &::placeholder {
+      ::placeholder {
         font-size: rem(12);
         font-weight: 500;
         font-family: "Montserrat", sans-serif;
-        color: var(--a-mainTextLight);
+        color: var(--a-bgDark);
+
+        &:hover {
+          color: var(--a-bgDark);
+          transition: all 0.4s ease-in-out;
+        }
+      }
+
+      &.dp__pointer {
+        color: var(--a-mainText);
+        background-color: var(--a-mainBg);
+
+        &:hover {
+          color: var(--a-accentTextExDark);
+        }
       }
     }
 

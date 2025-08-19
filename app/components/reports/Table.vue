@@ -166,35 +166,44 @@
   const sorting = ref<SortingState>([]);
 
   const table = useVueTable({
-    data: props.reports,
-    columns: columns.value,
+    get data() {
+      return props.reports;
+    },
+    get columns() {
+      return columns.value;
+    },
     state: {
       get sorting() {
         return sorting.value;
       },
     },
-
     onSortingChange: (updater) => {
-      if (typeof updater === "function") {
-        sorting.value = updater(sorting.value);
-      } else {
-        sorting.value = updater;
-      }
-      // Можно добавить здесь вызов API для серверной сортировки
+      sorting.value =
+        typeof updater === "function" ? updater(sorting.value) : updater;
+      emit("sortChange", sorting.value);
     },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
 
+  watch(
+    () => props.pagination?.currentPage,
+    (newVal, oldVal) => {
+      if (newVal !== oldVal) {
+        sorting.value = [...sorting.value];
+      }
+    },
+  );
+
   const pageNumbers = computed(() => {
     if (!props.pagination) return [];
     const { currentPage, lastPage } = props.pagination;
-    const range = [];
+    const range: (number | string)[] = [];
 
     range.push(1);
 
     if (currentPage > 3) {
-      range.push("...");
+      range.push("left...");
     }
 
     for (
@@ -206,7 +215,7 @@
     }
 
     if (currentPage < lastPage - 2) {
-      range.push("...");
+      range.push("right...");
     }
 
     if (lastPage > 1) {
@@ -225,10 +234,18 @@
       emit("pageChange", page);
     }
   };
+
+  const buttonClasses = computed(() => {
+    return pageNumbers.value.map((page) => ({
+      [$style.pageButton]: true,
+      [$style.active]: page === (props.pagination?.currentPage || 1),
+      [$style.disabled]: page === "...",
+    }));
+  });
 </script>
 
 <template>
-  <div :class="$style.tableContainer">
+  <div :key="pagination?.currentPage" :class="$style.tableContainer">
     <div v-if="!headers || !reports" class="text-gray-500">
       Нет данных для отображения
     </div>
@@ -289,44 +306,45 @@
       </div>
     </template>
 
-    <div v-if="pagination" :class="$style.pagination">
-      <button
-        :class="[
-          $style.pageButton,
-          { [$style.disabled]: pagination.currentPage === 1 },
-        ]"
-        @click="handlePageChange(pagination.currentPage - 1)"
-      >
-        Назад
-      </button>
-
-      <div :class="$style.pageNumbers">
+    <footer :class="$style.footer">
+      <div v-if="pagination" :class="$style.pagination">
         <button
-          v-for="page in pageNumbers"
-          :key="page"
-          :class="[
-            $style.pageButton,
-            {
-              [$style.active]: page === pagination.currentPage,
-              [$style.disabled]: page === '...',
-            },
-          ]"
-          @click="handlePageChange(page)"
+          :class="{
+            [$style.pageButton]: true,
+            [$style.disabled]: pagination.currentPage === 1,
+          }"
+          @click="handlePageChange(pagination.currentPage - 1)"
         >
-          {{ page }}
+          Назад
+        </button>
+        <div :class="$style.pageNumbers">
+          <button
+            v-for="(page, index) in pageNumbers"
+            :key="`page-${index}-${page}`"
+            :class="buttonClasses[index]"
+            @click="typeof page === 'number' && handlePageChange(page)"
+          >
+            {{ page === "..." ? "..." : page }}
+          </button>
+        </div>
+
+        <button
+          :class="{
+            [$style.pageButton]: true,
+            [$style.disabled]: pagination.currentPage === pagination.lastPage,
+          }"
+          @click="handlePageChange(pagination.currentPage + 1)"
+        >
+          Вперед
         </button>
       </div>
-
-      <button
-        :class="[
-          $style.pageButton,
-          { [$style.disabled]: pagination.currentPage === pagination.lastPage },
-        ]"
-        @click="handlePageChange(pagination.currentPage + 1)"
-      >
-        Вперед
-      </button>
-    </div>
+      <div :class="$style.reportTotal">
+        <div>
+          <span :class="$style.title">Всего отчетов:</span>
+          <span :class="$style.data">{{ pagination?.total }}</span>
+        </div>
+      </div>
+    </footer>
   </div>
 </template>
 
@@ -446,13 +464,37 @@
     }
   }
 
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
   .pagination {
     display: flex;
-    justify-content: center;
     align-items: center;
     gap: 8px;
     padding: 16px 0;
     margin-top: auto;
+  }
+
+  .reportTotal {
+    display: flex;
+    align-items: center;
+    padding-right: rem(40);
+  }
+
+  .title {
+    margin-right: rem(16);
+    font-size: rem(16);
+    font-weight: 600;
+    color: var(--a-mainText);
+  }
+
+  .data {
+    font-size: rem(18);
+    font-weight: 600;
+    color: var(--a-accentTextExDark);
   }
 
   .pageNumbers {
@@ -478,9 +520,9 @@
     }
 
     &.active {
-      background: var(--a-bgAccent);
-      color: var(--a-mainText);
-      border-color: var(--a-borderAccent);
+      background: var(--a-bgAccentDark);
+      color: var(--a-white);
+      border-color: var(--a-borderAccentDark);
     }
 
     &.disabled {

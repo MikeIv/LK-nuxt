@@ -122,10 +122,22 @@
 
   .accentBtn {
     background-color: var(--a-bgAccentLight);
+
+    &:hover {
+      color: var(--a-white);
+      background-color: var(--a-bgAccentDark);
+      transition: background-color 0.3s;
+    }
   }
 
   .secondBtn {
     background-color: var(--a-bgGray);
+
+    &:hover {
+      color: var(--a-white);
+      background-color: var(--a-bgGrayDark);
+      transition: background-color 0.3s;
+    }
   }
 
   .messageBtn {

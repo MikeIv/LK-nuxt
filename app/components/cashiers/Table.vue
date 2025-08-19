@@ -544,5 +544,11 @@
         color: var(--a-accentTextExDark);
       }
     }
+
+    .dp__icon {
+      &:hover {
+        fill: var(--a-bgWarning);
+      }
+    }
   }
 </style>

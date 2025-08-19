@@ -415,8 +415,22 @@
     cursor: pointer;
 
     &:disabled {
+      padding: rem(2) rem(12);
+      background-color: var(--a-bgLight);
+      border: 1px solid var(--a-borderAccent);
       opacity: 0.5;
       cursor: not-allowed;
+
+      &:hover {
+        color: var(--a-mainText);
+        background-color: var(--a-bgLight);
+        border: 1px solid var(--a-borderAccent);
+      }
+    }
+    &:hover {
+      color: var(--a-white);
+      background-color: var(--a-bgAccentDark);
+      transition: background-color 0.3s;
     }
   }
 
