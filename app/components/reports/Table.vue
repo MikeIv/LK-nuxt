@@ -64,7 +64,10 @@
             ...baseColumn,
             size: 60,
             cell: ({ row }) => {
-              const number = row.index + 1;
+              if (!props.pagination) return row.index + 1;
+
+              const { currentPage, perPage } = props.pagination;
+              const number = (currentPage - 1) * perPage + row.index + 1;
               return number < 10 ? `0${number}` : number;
             },
           };

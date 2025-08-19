@@ -30,17 +30,17 @@
       <div :class="$style.content">
         <UIcon name="i-exclamation" :class="$style.icon" />
         <h3 :class="$style.title">Подтверждение выхода</h3>
-        <p :class="$style.message">Все не сохраненные данные будут утеряны</p>
+        <p :class="$style.message">Вы уверены что хотите выйти?</p>
 
         <div :class="$style.buttons">
           <button
             :class="[$style.btn, $style.btnContinue]"
             @click="handleConfirm(true)"
           >
-            Продолжить
+            Выйти
           </button>
           <button :class="[$style.btn, $style.btnCancel]" @click="close">
-            Вернуться
+            Отменить
           </button>
         </div>
       </div>
@@ -150,19 +150,21 @@
   }
 
   .btnContinue {
-    background-color: var(--a-bgWarning);
-    color: var(--a-white);
+    background-color: var(--a-bgAccentExLight);
+    color: var(--a-mainText);
 
     &:hover {
-      background-color: var(--a-bgWarningHover);
+      color: var(--a-mainText);
+      background-color: var(--a-bgAccentLight);
     }
   }
 
   .btnCancel {
     background-color: var(--a-bgAccentExLight);
-    color: var(--a-accentTextExDark);
+    color: var(--a-mainText);
 
     &:hover {
+      color: var(--a-white);
       background-color: var(--a-bgAccentDark);
     }
   }

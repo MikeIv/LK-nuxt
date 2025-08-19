@@ -57,7 +57,7 @@ export const useKktInput = (
     }
 
     if (kktNumber.length !== 16) {
-      kktErrors.value[index] = "Номер ККТ должен содержать ровно 16 цифр";
+      kktErrors.value[index] = "Ровно 16 цифр";
       return false;
     }
 

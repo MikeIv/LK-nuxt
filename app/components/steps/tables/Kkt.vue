@@ -12,6 +12,7 @@
     initialAddedRowsIndices?: number[];
     loading?: boolean;
     error?: string | boolean;
+    isFromApi?: boolean;
   }
 
   const props = withDefaults(defineProps<KktTableProps>(), {
@@ -21,6 +22,7 @@
     addedRowsIndices: () => [],
     loading: false,
     error: false,
+    isFromApi: false,
   });
 
   const emit = defineEmits<{
@@ -237,16 +239,22 @@
           maxlength="16"
           inputmode="numeric"
           required
+          :readonly="isFromApi"
           :class="[
             $style.inputField,
-            { [$style.errorInput]: shouldShowErrorKkt(index) },
+            {
+              [$style.errorInput]: shouldShowErrorKkt(index),
+              [$style.readonlyField]: isFromApi,
+            },
             {
               [$style.pulse]:
-                index === editableRows.length - 1 && !row?.registration_number,
+                index === editableRows.length - 1 &&
+                !row?.registration_number &&
+                !isFromApi,
             },
           ]"
-          @input="handleKktInput($event, index)"
-          @blur="validateKktNumber(index)"
+          @input="!isFromApi && handleKktInput($event, index)"
+          @blur="!isFromApi && validateKktNumber(index)"
         />
         <div v-if="shouldShowErrorKkt(index)" :class="$style.errorMessage">
           {{ kktErrors[index] }}
@@ -478,6 +486,17 @@
     color: var(--a-errorText);
     font-size: rem(10);
     margin-top: rem(4);
+  }
+
+  .readonlyField {
+    background-color: var(--a-bgDisabled);
+    cursor: not-allowed;
+    color: var(--a-textDisabled);
+
+    &:focus {
+      outline: none;
+      border-color: var(--a-borderDisabled);
+    }
   }
 
   .pulse {

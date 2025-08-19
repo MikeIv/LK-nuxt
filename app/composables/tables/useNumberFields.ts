@@ -121,7 +121,9 @@ export const useNumberFields = (
     let error: string | null = null;
 
     // Проверка на обязательность
-    if (rules.required && !value) {
+
+    console.log("value", value);
+    if (!value) {
       error = "Поле обязательно для заполнения";
     }
     // Проверка на ноль (если не разрешено)
