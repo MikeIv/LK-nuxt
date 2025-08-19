@@ -26,6 +26,34 @@
     height: 100%;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+      width: rem(8);
+      height: rem(8);
+    }
+
+    &::-webkit-scrollbar-track {
+      background: var(--a-bgLight);
+      border-radius: rem(4);
+      margin: rem(4) 0;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--a-borderAccent);
+      border-radius: rem(4);
+      transition: background 0.3s ease;
+
+      &:hover {
+        background: var(--a-mainBg);
+      }
+    }
+
+    /* Стили для Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: var(--a-borderAccent) var(--a-bgLight);
+
+    /* Стили для IE/Edge */
+    -ms-overflow-style: -ms-autohiding-scrollbar;
   }
 
   .wrapper {

@@ -64,6 +64,21 @@ ul {
 
   &.solid {
     background-color: var(--a-accentTextDark);
+
+    &.disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+
+      &:hover {
+        color: var(--a-mainText);
+        background-color: var(--a-accentTextDark);
+      }
+    }
+
+    &:hover {
+      color: var(--a-white);
+      background-color: var(--a-bgAccentDark);
+    }
   }
 
   &.ghost {

@@ -118,7 +118,7 @@
   const createEmptyRow = (): CashTableRow => ({
     id: "",
     name: "",
-    settlement_account_number: "0",
+    settlement_account_number: "",
     amount_with_nds: "0",
     amount_nds: "0",
     file_ids: [],
