@@ -97,6 +97,11 @@
     addedRowsCount.value++;
     tableMessage.value = "Добавлена касса";
     emit("rows-added", [...addedRowsIndices.value]);
+
+    nextTick(() => {
+      const lastIndex = editableRows.value.length - 1;
+      registrationNumberInputs.value[lastIndex]?.focus();
+    });
   };
 
   const removeLastRow = (): void => {
@@ -190,6 +195,15 @@
     getTableData,
     setData,
   });
+
+  const registrationNumberInputs = ref<(HTMLInputElement | null)[]>([]);
+
+  const setRegistrationNumberRef = (
+    el: HTMLInputElement | null,
+    index: number,
+  ) => {
+    registrationNumberInputs.value[index] = el;
+  };
 </script>
 
 <template>
@@ -216,6 +230,7 @@
       </div>
       <div class="cell body-cell">
         <input
+          :ref="(el) => setRegistrationNumberRef(el, index)"
           type="text"
           :value="row?.registration_number"
           placeholder="Ровно 16 цифр"
@@ -225,6 +240,10 @@
           :class="[
             $style.inputField,
             { [$style.errorInput]: shouldShowErrorKkt(index) },
+            {
+              [$style.pulse]:
+                index === editableRows.length - 1 && !row?.registration_number,
+            },
           ]"
           @input="handleKktInput($event, index)"
           @blur="validateKktNumber(index)"
@@ -459,5 +478,23 @@
     color: var(--a-errorText);
     font-size: rem(10);
     margin-top: rem(4);
+  }
+
+  .pulse {
+    color: var(--a-errorText);
+    background-color: var(--a-bgWarning);
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+    100% {
+      opacity: 1;
+    }
   }
 </style>
