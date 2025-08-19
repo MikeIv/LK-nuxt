@@ -18,9 +18,6 @@ export const useNumberFields = (
   numberErrors: Ref<Record<number, string>>,
   fieldValidations: Partial<Record<NumberField, ValidationRules>> = {},
 ) => {
-  /**
-   * Форматирует ввод числа, оставляя только цифры, запятые и минус
-   */
   const formatNumberInput = (value: string): string => {
     // Удаляем все символы, кроме цифр, минуса и запятой
     let cleaned = value.replace(/[^\d,-]/g, "");
@@ -45,9 +42,6 @@ export const useNumberFields = (
     return cleaned;
   };
 
-  /**
-   * Форматирует число при потере фокуса
-   */
   const formatNumberBlur = (value: string): string => {
     if (!value) return "";
 
@@ -62,16 +56,12 @@ export const useNumberFields = (
     return `${integer},${paddedDecimal}`;
   };
 
-  /**
-   * Обработчик ввода для числовых полей
-   */
   const handleNumberInput = (
     event: Event,
     field: NumberField,
     index: number,
   ): void => {
     const target = event.target as HTMLInputElement;
-    // const cursorPosition = target.selectionStart;
     let value = target.value;
 
     // Форматируем ввод
@@ -81,16 +71,8 @@ export const useNumberFields = (
     editableRows.value[index][field] = value;
     target.value = value;
 
-    // Восстанавливаем позицию курсора
-    // if (cursorPosition !== null) {
-    //   requestAnimationFrame(() => {
-    //     const newPosition = Math.max(0, Math.min(cursorPosition, value.length));
-    //     target.setSelectionRange(newPosition, newPosition);
-    //   });
-    // }
-
-    // Сбрасываем ошибки для этого поля
-    clearFieldError(index, field);
+    // Сбрасываем ошибки при любом вводе
+    clearFieldError(index);
   };
 
   /**
@@ -112,40 +94,35 @@ export const useNumberFields = (
     }
   };
 
-  /**
-   * Валидация поля
-   */
   const validateField = (field: NumberField, index: number): boolean => {
     const value = editableRows.value[index][field];
     const rules = fieldValidations[field] || {};
     let error: string | null = null;
 
     // Проверка на обязательность
-
-    console.log("value", value);
-    if (!value) {
+    if (rules.required && !value) {
       error = "Поле обязательно для заполнения";
     }
     // Проверка на ноль (если не разрешено)
-    // else if (value === "0,00" && !rules.allowZero && rules.required) {
-    //   error = "Значение не может быть нулевым";
-    // }
+    else if (value === "0,00" && !rules.allowZero && rules.required) {
+      error = "Значение не может быть нулевым";
+    }
     // Проверка минимального значения
-    else if (rules.min !== undefined) {
-      const numValue = parseFloat(value.replace(",", ".") || 0);
+    else if (rules.min !== undefined && value) {
+      const numValue = parseFloat(value.replace(",", "."));
       if (numValue < rules.min) {
         error = `Значение не может быть меньше ${rules.min.toFixed(2).replace(".", ",")}`;
       }
     }
     // Проверка максимального значения
-    else if (rules.max !== undefined) {
-      const numValue = parseFloat(value.replace(",", ".")) || 0;
+    else if (rules.max !== undefined && value) {
+      const numValue = parseFloat(value.replace(",", "."));
       if (numValue > rules.max) {
         error = `Значение не может быть больше ${rules.max.toFixed(2).replace(".", ",")}`;
       }
     }
     // Кастомная валидация
-    else if (rules.customValidator) {
+    else if (rules.customValidator && value) {
       error = rules.customValidator(value);
     }
 
@@ -154,6 +131,8 @@ export const useNumberFields = (
       return false;
     }
 
+    // Если ошибок нет, очищаем
+    clearFieldError(index);
     return true;
   };
 
@@ -161,52 +140,48 @@ export const useNumberFields = (
    * Специальная валидация для показаний счетчиков
    */
   const validateMeterReadings = (index: number): void => {
-    const startStr = editableRows.value[index].start_meter_reading || "0,00";
-    const endStr = editableRows.value[index].end_meter_reading || "0,00";
+    const startStr = editableRows.value[index].start_meter_reading || "";
+    const endStr = editableRows.value[index].end_meter_reading || "";
 
-    const start = parseFloat(startStr.replace(",", "."));
-    const end = parseFloat(endStr.replace(",", "."));
+    // Если оба поля заполнены
+    if (startStr && endStr) {
+      const start = parseFloat(startStr.replace(",", "."));
+      const end = parseFloat(endStr.replace(",", "."));
 
-    if (start > end) {
-      numberErrors.value[index] =
-        "Начальное значение не может быть больше конечного";
-    } else if (
-      numberErrors.value[index] ===
-      "Начальное значение не может быть больше конечного"
-    ) {
-      clearFieldError(index);
+      if (start > end) {
+        numberErrors.value[index] =
+          "Начальное значение не может быть больше конечного";
+      } else {
+        // Если ошибка была именно про показания счетчиков - очищаем
+        if (
+          numberErrors.value[index] ===
+          "Начальное значение не может быть больше конечного"
+        ) {
+          clearFieldError(index);
+        }
+      }
     }
   };
 
   /**
    * Сброс ошибки для поля
    */
-  const clearFieldError = (index: number, field?: NumberField): void => {
-    if (!field || numberErrors.value[index]?.includes(field)) {
-      numberErrors.value[index] = undefined;
-    }
+  const clearFieldError = (index: number): void => {
+    numberErrors.value[index] = undefined;
   };
 
-  /**
-   * Проверка, нужно ли показывать ошибку для поля
-   */
   const shouldShowError = (index: number, field: NumberField): boolean => {
     const value = editableRows.value[index][field];
     const error = numberErrors.value[index];
     const rules = fieldValidations[field] || {};
 
+    // Если есть общая ошибка - показываем
     if (error) return true;
 
     // Если поле обязательно И пустое - показываем ошибку
     if (rules.required && !value) return true;
-    return (
-      !!error ||
-      (rules.required && !value) ||
-      (field === "start_meter_reading" &&
-        error === "Начальное значение не может быть больше конечного") ||
-      (field === "end_meter_reading" &&
-        error === "Начальное значение не может быть больше конечного")
-    );
+
+    return false;
   };
 
   return {

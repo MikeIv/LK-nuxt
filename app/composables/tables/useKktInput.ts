@@ -3,7 +3,7 @@ export const useKktInput = (
   kktErrors: Ref<Record<number, string>>,
 ) => {
   const validateRequired = (value: string): boolean => {
-    return value.trim().length >= 0;
+    return value.length > 0; // Просто проверяем длину, без trim()
   };
 
   const preventNonNumericInput = (event: KeyboardEvent): boolean => {
@@ -20,12 +20,10 @@ export const useKktInput = (
       "Enter",
     ];
 
-    // Разрешаем служебные клавиши
     if (allowedKeys.includes(event.key)) {
       return true;
     }
 
-    // Разрешаем только цифры (0-9)
     if (!/^\d$/.test(event.key)) {
       event.preventDefault();
       return false;
@@ -42,6 +40,11 @@ export const useKktInput = (
 
     const previousValue = editableRows.value[index].registration_number || "";
 
+    // Всегда очищаем ошибку при вводе, даже если значение не изменилось
+    if (kktErrors.value[index]) {
+      kktErrors.value[index] = undefined;
+    }
+
     if (cleanedValue === previousValue) return;
 
     editableRows.value[index].registration_number = cleanedValue;
@@ -55,10 +58,6 @@ export const useKktInput = (
           target.setSelectionRange(newCursorPosition, newCursorPosition);
         });
       }
-    }
-
-    if (kktErrors.value[index]) {
-      kktErrors.value[index] = undefined;
     }
 
     if (cleanedValue.length === 16) {
