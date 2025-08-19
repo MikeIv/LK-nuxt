@@ -1,41 +1,118 @@
-import type { UserData } from "~/types/user";
+import type { UserData } from "~~/shared/types/user";
 
-export const useUser = () => {
-  const { data: user, error, isLoading, callApi } = useApi<UserData>();
+export const useUserData = () => {
+  const userStore = useUserStore();
+  const { callApi } = useApi<UserData>();
 
   const fetchUser = async (): Promise<UserData | null> => {
-    return await callApi("/user/me");
+    userStore.setLoading(true);
+    userStore.setError(null);
+
+    try {
+      const result = await callApi("/user/me");
+
+      if (result && "payload" in result && result.payload) {
+        userStore.setUser(result.payload);
+        console.log("user!!!.payload", result.payload);
+        return result.payload;
+      }
+
+      return null;
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch user";
+      userStore.setError(errorMessage);
+      return null;
+    } finally {
+      userStore.setLoading(false);
+    }
   };
 
   const changeContract = async (
     newContractId: number,
   ): Promise<UserData | null> => {
-    return await callApi("/user/change-contract", {
-      method: "POST",
-      body: { contractId: newContractId },
-    });
+    userStore.setLoading(true);
+    userStore.setError(null);
+
+    try {
+      const result = await callApi("/user/change-contract", {
+        method: "POST",
+        body: { contractId: newContractId },
+      });
+
+      if (result && "payload" in result && result.payload) {
+        userStore.setUser(result.payload);
+        return result.payload;
+      }
+
+      return null;
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to change contract";
+      userStore.setError(errorMessage);
+      return null;
+    } finally {
+      userStore.setLoading(false);
+    }
   };
 
   const updateProfile = async (
     profileData: Partial<UserData>,
   ): Promise<UserData | null> => {
-    return await callApi("/user/profile", {
-      method: "PATCH",
-      body: profileData,
-    });
+    userStore.setLoading(true);
+    userStore.setError(null);
+
+    try {
+      const result = await callApi("/user/profile", {
+        method: "PATCH",
+        body: profileData,
+      });
+
+      if (result && "payload" in result && result.payload) {
+        userStore.setUser(result.payload);
+        return result.payload;
+      }
+
+      return null;
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to update profile";
+      userStore.setError(errorMessage);
+      return null;
+    } finally {
+      userStore.setLoading(false);
+    }
   };
 
   const deleteAccount = async (): Promise<boolean> => {
-    const result = await callApi("/user/account", {
-      method: "DELETE",
-    });
-    return result !== null;
+    userStore.setLoading(true);
+    userStore.setError(null);
+
+    try {
+      const result = await callApi("/user/account", {
+        method: "DELETE",
+      });
+
+      if (result !== null) {
+        userStore.clearUser();
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete account";
+      userStore.setError(errorMessage);
+      return false;
+    } finally {
+      userStore.setLoading(false);
+    }
   };
 
   return {
-    user,
-    error,
-    isLoading,
+    user: computed(() => userStore.user),
+    error: computed(() => userStore.error),
+    isLoading: computed(() => userStore.isLoading),
     fetchUser,
     changeContract,
     updateProfile,

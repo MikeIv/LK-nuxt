@@ -1,18 +1,18 @@
-// Получение данных по кассам KKT
-
 import { useApi } from "./useApi";
-import { useUser } from "~/stores/user";
 import { useAuthStore } from "~/stores/auth";
+import { useUserStore } from "~/stores/userData";
 
 export const useKkt = () => {
   const config = useRuntimeConfig();
-  const userStore = useUser();
   const authStore = useAuthStore();
+  const userStore = useUserStore();
+
   const {
     data: kktData,
     isLoading: kktLoading,
     error: kktError,
-    fetchData,
+    callApi,
+    pagination,
   } = useApi<unknown[]>();
 
   const loadKktData = async (): Promise<boolean> => {
@@ -25,25 +25,25 @@ export const useKkt = () => {
         throw new Error("Токен авторизации отсутствует");
       }
 
-      await fetchData(`${config.public.apiBase}/tenants/kkts`, {
+      const response = await callApi(`${config.public.apiBase}/tenants/kkts`, {
+        method: "GET",
         headers: {
           Authorization: `Bearer ${authStore.token}`,
         },
       });
 
+      // Проверяем успешность ответа
+      if (response && "success" in response && !response.success) {
+        throw new Error(response.message || "Ошибка при загрузке данных ККТ");
+      }
+
       return true;
     } catch (err: unknown) {
       console.error("Ошибка при загрузке данных ККТ:", err);
 
-      // Попробуем обновить токен, если ошибка 401
-      if (err.response?.status === 401) {
-        try {
-          await authStore.refreshToken();
-          return await loadKktData(); // Повторяем запрос после обновления токена
-        } catch (refreshError) {
-          console.error("Ошибка обновления токена:", refreshError);
-          throw refreshError;
-        }
+      if ((err as unknown)?.statusCode === 401) {
+        console.error("Требуется повторная авторизация");
+        throw err;
       }
 
       throw err;
@@ -55,5 +55,6 @@ export const useKkt = () => {
     kktLoading,
     kktError,
     loadKktData,
+    pagination,
   };
 };

@@ -71,7 +71,7 @@ export const useNumberFields = (
     index: number,
   ): void => {
     const target = event.target as HTMLInputElement;
-    const cursorPosition = target.selectionStart;
+    // const cursorPosition = target.selectionStart;
     let value = target.value;
 
     // Форматируем ввод
@@ -82,12 +82,12 @@ export const useNumberFields = (
     target.value = value;
 
     // Восстанавливаем позицию курсора
-    if (cursorPosition !== null) {
-      requestAnimationFrame(() => {
-        const newPosition = Math.max(0, Math.min(cursorPosition, value.length));
-        target.setSelectionRange(newPosition, newPosition);
-      });
-    }
+    // if (cursorPosition !== null) {
+    //   requestAnimationFrame(() => {
+    //     const newPosition = Math.max(0, Math.min(cursorPosition, value.length));
+    //     target.setSelectionRange(newPosition, newPosition);
+    //   });
+    // }
 
     // Сбрасываем ошибки для этого поля
     clearFieldError(index, field);

@@ -83,7 +83,10 @@
     };
   }
 
+  const showRemoveButton = ref(false);
+
   const addRow = (): void => {
+    showRemoveButton.value = true;
     const newRow = createEmptyRow();
     newRow.name = `Основание ${editableRows.value.length + 1}`;
     editableRows.value.push(newRow);
@@ -97,6 +100,7 @@
     if (editableRows.value.length > 1 && addedRowsIndices.value.length > 0) {
       const lastAddedIndex = addedRowsIndices.value.pop();
       if (lastAddedIndex !== undefined) {
+        showRemoveButton.value = false;
         editableRows.value.splice(lastAddedIndex, 1);
         addedRowsIndices.value = addedRowsIndices.value.map((i) =>
           i > lastAddedIndex ? i - 1 : i,
@@ -191,6 +195,7 @@
     :message="tableMessage"
     add-button-text="Добавить основание"
     remove-button-text="Отменить добавление"
+    :show-remove-button="showRemoveButton"
     is-table
     @add="addRow"
     @remove="removeLastRow"

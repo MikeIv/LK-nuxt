@@ -1,8 +1,12 @@
+import { useUserStore } from "~/stores/userData";
+
 export default defineNuxtRouteMiddleware(async (to) => {
   if (import.meta.server) return;
 
+  const userStore = useUserStore();
   const authStore = useAuthStore();
-  const user = useUser();
+  const { fetchUser } = useUserData();
+  // const user = useUser();
   const token = useCookie("token").value;
   const isLoginPage = to.path === "/login";
 
@@ -22,9 +26,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   // 4. Если пользователь авторизован, но данные не загружены
-  if (authStore.isAuthenticated && !user.user.value && !user.isLoading.value) {
+  if (authStore.isAuthenticated && !userStore.user && !userStore.isLoading) {
     try {
-      await user.fetchUser();
+      await fetchUser();
     } catch (error) {
       // Если ошибка 401 - разлогиниваем
       if (error.response?.status === 401) {

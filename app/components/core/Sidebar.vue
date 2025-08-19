@@ -1,10 +1,17 @@
 <script setup lang="ts">
   import { useLocalStorage } from "@vueuse/core";
-  import { useUser } from "~/stores/user";
-  import { useApi } from "~/composables/useApi";
+  import { useUserStore } from "~/stores/userData";
   const { isActive } = useActiveRoute();
 
-  const userStore = useUser();
+  const userStore = useUserStore();
+
+  // Данные уже есть в сторе после авторизации
+  console.log("UserSIDBAR:", userStore.user);
+  console.log("Is authenticated:", userStore.isAuthenticated);
+
+  // const userStore = useUser();
+  // console.log("userStore", userStore.user);
+
   const { isLoading } = useApi();
   const sidebarCollapsed = useLocalStorage("sidebarCollapsed", false);
 

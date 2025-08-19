@@ -1,7 +1,14 @@
 <script setup lang="ts">
+  import { useUserStore } from "~/stores/userData";
+
   definePageMeta({
     middleware: "auth",
   });
+
+  const userStore = useUserStore();
+
+  // Данные уже есть в сторе после авторизации
+  console.log("User INDEX:", userStore.user);
 
   const { user, fetchUser, isLoading, error } = useUser();
   const { callApi, data: kktData } = useApi<UserData>();
@@ -10,12 +17,15 @@
   const isError = ref(false);
 
   const userFields = computed(() => [
-    { label: "Юридическое лицо", value: user?.value?.tenant_name },
-    { label: "Бренд", value: user?.value?.brand },
-    { label: "Номер помещения", value: user?.value?.room_number },
-    { label: "Номер договора", value: user?.value?.contract_number },
-    { label: "Тип договора", value: user?.value?.contract_type },
-    { label: "Дата заключения договора", value: user?.value?.contract_date },
+    { label: "Юридическое лицо", value: userStore.user?.tenant_name },
+    { label: "Бренд", value: userStore.user?.brand },
+    { label: "Номер помещения", value: userStore.user?.room_number },
+    { label: "Номер договора", value: userStore.user?.contract_number },
+    { label: "Тип договора", value: userStore.user?.contract_type },
+    {
+      label: "Дата заключения договора",
+      value: userStore.user?.contract_date,
+    },
   ]);
 
   console.log("userFields", userFields);

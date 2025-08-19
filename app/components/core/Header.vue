@@ -1,18 +1,23 @@
 <script setup lang="ts">
   import { useAuthStore } from "~/stores/auth";
-  import { useUser } from "~/stores/user";
+  import { useUserStore } from "~/stores/userData";
   import { useApi } from "~/composables/useApi";
   import { useStepTwoStore } from "~/stores/stepTwo";
 
-  const userStore = useUser();
-  const { isLoading, error } = useApi<unknown>();
+  // Используем стор для получения данных
+  const userStore = useUserStore();
+  // Используем composable для методов
+  const { fetchUser, changeContract } = useUserData();
 
   const authStore = useAuthStore();
+  const { isLoading, error } = useApi<unknown>();
 
   const userInfo = computed(() => {
-    console.log("USER", userStore.user.value);
-    const user = userStore.user.value;
-    if (!userStore.user) return null;
+    console.log("USER from userData store HEADER:", userStore.user);
+
+    const user = userStore.user;
+    if (!user) return null;
+
     return [
       user?.tenant_name,
       user?.brand,
@@ -42,6 +47,9 @@
       stepTwoStore.$reset();
 
       await authStore.logOut();
+
+      // Очищаем данные пользователя при выходе
+      userStore.clearUser();
 
       if (import.meta.env.VITE_API_DATA_ONLY_MODE) {
         authStore.$patch({
@@ -83,21 +91,19 @@
   const hasContractsToShow = computed(() => filteredContracts.value.length > 0);
 
   const handleContractChange = async (contractId: number) => {
-    const { isLoading, error } = useApi<unknown>();
-
     try {
       isLoading.value = true;
       error.value = null;
 
-      await userStore.changeContract(contractId);
+      // Используем метод из composable, который обновит стор userData
+      await changeContract(contractId);
 
       await refreshNuxtData();
       await navigateTo({ path: "/" }, { replace: true });
     } catch (e: unknown) {
-      error.value =
-        e instanceof Error
-          ? e
-          : new Error("Ошибка переключения договора", { cause: e });
+      const errorMessage =
+        e instanceof Error ? e.message : "Ошибка переключения договора";
+      error.value = new Error(errorMessage, { cause: e });
 
       console.error("Failed to change contract:", error.value);
 
@@ -112,8 +118,11 @@
   };
 
   onMounted(async () => {
-    await userStore.fetchUser();
-    console.log(userStore.user);
+    if (!userStore.user) {
+      console.log("Fetching user data...");
+      await fetchUser();
+    }
+    console.log("User data from userData store:", userStore.user);
   });
 </script>
 
@@ -145,6 +154,9 @@
     </div>
     <div :class="$style.bottomRow">
       <p v-if="userInfo">{{ userInfo }}</p>
+      <p v-else-if="userStore.isLoading">Загрузка данных пользователя...</p>
+      <p v-else-if="userStore.error">Ошибка: {{ userStore.error }}</p>
+      <p v-else>Пользователь не авторизован</p>
     </div>
 
     <div v-if="error" :class="$style.error">
