@@ -64,14 +64,11 @@ export const useNumberFields = (
     const target = event.target as HTMLInputElement;
     let value = target.value;
 
-    // Форматируем ввод
     value = formatNumberInput(value);
 
-    // Сохраняем новое значение
     editableRows.value[index][field] = value;
     target.value = value;
 
-    // Сбрасываем ошибки при любом вводе
     clearFieldError(index);
   };
 
@@ -85,7 +82,6 @@ export const useNumberFields = (
     value = formatNumberBlur(value);
     editableRows.value[index][field] = value;
 
-    // Выполняем валидацию
     validateField(field, index);
 
     // Специальная валидация для показаний счетчика
@@ -163,9 +159,6 @@ export const useNumberFields = (
     }
   };
 
-  /**
-   * Сброс ошибки для поля
-   */
   const clearFieldError = (index: number): void => {
     numberErrors.value[index] = undefined;
   };
@@ -175,10 +168,8 @@ export const useNumberFields = (
     const error = numberErrors.value[index];
     const rules = fieldValidations[field] || {};
 
-    // Если есть общая ошибка - показываем
     if (error) return true;
 
-    // Если поле обязательно И пустое - показываем ошибку
     if (rules.required && !value) return true;
 
     return false;
