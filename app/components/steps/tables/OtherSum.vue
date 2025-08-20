@@ -34,7 +34,6 @@
     (e: "file-removed", payload: { index: number; fileIndex: number }): void;
   }>();
 
-  // Реактивные данные
   const editableRows = ref<OverSumTableRow[]>([]);
   const addedRowsIndices = ref<number[]>([]);
   const editingNameIndex = ref<number | null>(null);
@@ -42,17 +41,180 @@
   const tableMessage = ref("");
   const showRemoveButton = ref(false);
   const invalidFields = ref<Record<number, string[]>>({});
+  const modifiedFields = ref<Record<number, Set<string>>>({});
 
-  // Composable
+  const markFieldAsModified = (index: number, field: string) => {
+    if (!modifiedFields.value[index]) {
+      modifiedFields.value[index] = new Set();
+    }
+    modifiedFields.value[index].add(field);
+  };
+
   const fieldValidations = {
-    amount_with_nds: { required: true, min: 0 },
-    amount_nds: { required: true, min: 0 },
+    amount_with_nds: (value: string) => {
+      const num = parseFloat(value.replace(",", "."));
+      return !isNaN(num) && num >= 0;
+    },
+    amount_nds: (value: string) => {
+      const num = parseFloat(value.replace(",", "."));
+      return !isNaN(num) && num >= 0;
+    },
   } as const;
 
-  const numberErrors = ref<Record<number, string>>({});
+  const formatNumberInput = (value: string): string => {
+    let cleaned = value.replace(/[^\d,-]/g, "");
 
-  const { handleNumberInput, handleNumberBlur, shouldShowError } =
-    useNumberFields(editableRows, numberErrors, fieldValidations);
+    const minusIndex = cleaned.indexOf("-");
+    if (minusIndex > 0) {
+      cleaned = cleaned.replace(/-/g, "");
+      cleaned = "-" + cleaned;
+    } else if (minusIndex === 0) {
+      cleaned = "-" + cleaned.replace(/-/g, "");
+    }
+
+    const commaIndex = cleaned.indexOf(",");
+    if (commaIndex !== -1) {
+      cleaned =
+        cleaned.slice(0, commaIndex + 1) +
+        cleaned.slice(commaIndex + 1).replace(/,/g, "");
+    }
+
+    return cleaned;
+  };
+
+  const formatNumberBlur = (value: string): string => {
+    if (!value) return "0,00";
+
+    if (!value.includes(",")) {
+      return `${value},00`;
+    }
+
+    const [integer, decimal] = value.split(",");
+    const paddedDecimal = (decimal || "").padEnd(2, "0").slice(0, 2);
+    return `${integer},${paddedDecimal}`;
+  };
+
+  const handleNumberInput = (
+    event: Event,
+    field: "amount_with_nds" | "amount_nds",
+    index: number,
+  ): void => {
+    const target = event.target as HTMLInputElement;
+    let value = target.value;
+
+    value = formatNumberInput(value);
+
+    editableRows.value[index][field] = value;
+    target.value = value;
+
+    markFieldAsModified(index, field);
+    validateRow(index);
+    emitUpdate();
+  };
+
+  const handleNumberBlur = (
+    field: "amount_with_nds" | "amount_nds",
+    index: number,
+  ): void => {
+    let value = editableRows.value[index][field];
+
+    value = formatNumberBlur(value);
+    editableRows.value[index][field] = value;
+
+    markFieldAsModified(index, field);
+    validateRow(index);
+    emitUpdate();
+  };
+
+  const shouldShowError = (
+    index: number,
+    field: "amount_with_nds" | "amount_nds" | "name" | "files",
+  ): boolean => {
+    return invalidFields.value[index]?.includes(field) || false;
+  };
+
+  const validateRow = (index: number) => {
+    const errors: string[] = [];
+    const row = editableRows.value[index];
+
+    const amountWithNds = row.amount_with_nds;
+    const amountNds = row.amount_nds;
+    const name = row.name;
+    const hasFileIds = row.file_ids && row.file_ids.length > 0;
+
+    const hasAmountWithNds = amountWithNds && amountWithNds !== "0,00";
+    const hasAmountNds = amountNds && amountNds !== "0,00";
+    const hasName = name && name.trim() !== "";
+
+    if (hasAmountWithNds && !fieldValidations.amount_with_nds(amountWithNds)) {
+      errors.push("amount_with_nds");
+    }
+
+    if (hasAmountNds && !fieldValidations.amount_nds(amountNds)) {
+      errors.push("amount_nds");
+    }
+
+    const isNewlyAddedRow = addedRowsIndices.value.includes(index);
+    if (isNewlyAddedRow) {
+      if (!hasName) errors.push("name");
+      if (!hasAmountWithNds) errors.push("amount_with_nds");
+      if (!hasAmountNds) errors.push("amount_nds");
+      if (!hasFileIds) errors.push("files");
+    } else {
+      let hasNonEmptyModifiedField = false;
+      if (modifiedFields.value[index]) {
+        for (const field of modifiedFields.value[index]) {
+          if (field === "name" && hasName) hasNonEmptyModifiedField = true;
+          if (field === "amount_with_nds" && hasAmountWithNds)
+            hasNonEmptyModifiedField = true;
+          if (field === "amount_nds" && hasAmountNds)
+            hasNonEmptyModifiedField = true;
+        }
+      }
+
+      if (hasNonEmptyModifiedField) {
+        if (!hasName) errors.push("name");
+        if (!hasAmountWithNds) errors.push("amount_with_nds");
+        if (!hasAmountNds) errors.push("amount_nds");
+        if (!hasFileIds) errors.push("files");
+      }
+
+      if (modifiedFields.value[index] && !hasNonEmptyModifiedField) {
+        const { [index]: _, ...rest } = modifiedFields.value;
+        modifiedFields.value = rest;
+      }
+    }
+
+    invalidFields.value = {
+      ...invalidFields.value,
+      [index]: errors,
+    };
+
+    return errors.length === 0;
+  };
+
+  const hasAmountInRow = (row: OverSumTableRow, index: number): boolean => {
+    const isNewlyAddedRow = addedRowsIndices.value.includes(index);
+    if (isNewlyAddedRow) return true;
+
+    let hasNonEmptyModifiedField = false;
+    if (modifiedFields.value[index]) {
+      const hasAmountWithNds =
+        row.amount_with_nds && row.amount_with_nds !== "0,00";
+      const hasAmountNds = row.amount_nds && row.amount_nds !== "0,00";
+      const hasName = row.name && row.name.trim() !== "";
+
+      for (const field of modifiedFields.value[index]) {
+        if (field === "name" && hasName) hasNonEmptyModifiedField = true;
+        if (field === "amount_with_nds" && hasAmountWithNds)
+          hasNonEmptyModifiedField = true;
+        if (field === "amount_nds" && hasAmountNds)
+          hasNonEmptyModifiedField = true;
+      }
+    }
+    return hasNonEmptyModifiedField;
+  };
+
   const { loading: fileLoading } = useSaveFile();
   const { handleFileUploaded, handleFileRemoved } =
     useFileHandling<OverSumTableRow>({
@@ -66,44 +228,34 @@
       }),
     });
 
-  const validateRow = (index: number) => {
-    const errors: string[] = [];
-    const row = editableRows.value[index];
-
-    if (!row.name?.trim()) errors.push("name");
-
-    const amountWithNdsValid = !shouldShowError(index, "amount_with_nds");
-    const amountNdsValid = !shouldShowError(index, "amount_nds");
-
-    if (!amountWithNdsValid) errors.push("amount_with_nds");
-    if (!amountNdsValid) errors.push("amount_nds");
-
-    invalidFields.value = {
-      ...invalidFields.value,
-      [index]: errors,
-    };
-
-    return errors.length === 0;
-  };
-
   const { totalWithVAT, totalVAT } = useCashCalculations(editableRows);
 
-  // Методы
   const createEmptyRow = (): OverSumTableRow => ({
     id: "",
     name: "",
-    amount_with_nds: "",
-    amount_nds: "",
+    amount_with_nds: "0,00",
+    amount_nds: "0,00",
     file_ids: [],
     files: [],
     isNew: true,
   });
 
-  const normalizeRowData = (row: OverSumTableRow): OverSumTableRow => ({
-    ...createEmptyRow(),
-    ...row,
-    isNew: false,
-  });
+  const normalizeRowData = (row: OverSumTableRow): OverSumTableRow => {
+    const isApiData = !!(row.name && row.name.trim() !== "");
+    return {
+      ...createEmptyRow(),
+      ...row,
+      amount_with_nds:
+        typeof row.amount_with_nds === "number"
+          ? row.amount_with_nds.toFixed(2).replace(".", ",")
+          : row.amount_with_nds || "0,00",
+      amount_nds:
+        typeof row.amount_nds === "number"
+          ? row.amount_nds.toFixed(2).replace(".", ",")
+          : row.amount_nds || "0,00",
+      isNew: !isApiData,
+    };
+  };
 
   const emitUpdate = () => {
     emit("update:tableData", [...editableRows.value]);
@@ -125,28 +277,54 @@
     tableMessage.value = "Основание добавлено";
     emitUpdate();
     emit("rows-added", [newIndex]);
+
+    // Валидируем новую строку
+    validateRow(newIndex);
   };
 
   const removeLastRow = () => {
-    if (
-      editableRows.value.length === 0 ||
-      addedRowsIndices.value.length === 0
-    ) {
+    // Проверяем, есть ли добавленные строки для удаления
+    if (addedRowsIndices.value.length === 0) {
       showRemoveButton.value = false;
       return;
     }
 
-    const currentIndices = [...addedRowsIndices.value];
-    const lastAddedIndex = currentIndices[currentIndices.length - 1];
+    // Находим последний добавленный индекс (самый большой)
+    const lastAddedIndex = Math.max(...addedRowsIndices.value);
 
+    // Удаляем строку
     editableRows.value.splice(lastAddedIndex, 1);
 
-    const { [lastAddedIndex]: _, ...rest } = invalidFields.value;
-    invalidFields.value = rest;
+    // Удаляем индекс из массива добавленных индексов
+    addedRowsIndices.value = addedRowsIndices.value.filter(
+      (index) => index !== lastAddedIndex,
+    );
 
-    addedRowsIndices.value = currentIndices
-      .filter((index) => index !== lastAddedIndex)
-      .map((index) => (index > lastAddedIndex ? index - 1 : index));
+    // Обновляем остальные индексы (уменьшаем на 1 те, что больше удаленного)
+    addedRowsIndices.value = addedRowsIndices.value.map((index) =>
+      index > lastAddedIndex ? index - 1 : index,
+    );
+
+    // Обновляем invalidFields
+    const newInvalidFields: Record<number, string[]> = {};
+    Object.entries(invalidFields.value).forEach(([key, value]) => {
+      const numKey = Number(key);
+      if (numKey !== lastAddedIndex) {
+        newInvalidFields[numKey > lastAddedIndex ? numKey - 1 : numKey] = value;
+      }
+    });
+    invalidFields.value = newInvalidFields;
+
+    // Обновляем modifiedFields
+    const newModifiedFields: Record<number, Set<string>> = {};
+    Object.entries(modifiedFields.value).forEach(([key, value]) => {
+      const numKey = Number(key);
+      if (numKey !== lastAddedIndex) {
+        newModifiedFields[numKey > lastAddedIndex ? numKey - 1 : numKey] =
+          value;
+      }
+    });
+    modifiedFields.value = newModifiedFields;
 
     showRemoveButton.value = addedRowsIndices.value.length > 0;
     tableMessage.value = "Основание удалено";
@@ -157,12 +335,15 @@
   const handleNameChange = (index: number, event: Event) => {
     const target = event.target as HTMLInputElement;
     editableRows.value[index].name = target.value;
+    markFieldAsModified(index, "name");
     validateRow(index);
+    emitUpdate();
   };
 
   const finishNameEditing = (index: number) => {
     editingNameIndex.value = null;
     validateRow(index);
+    emitUpdate();
   };
 
   // Watchers
@@ -175,14 +356,13 @@
           : [createEmptyRow()];
         addedRowsIndices.value = [];
         invalidFields.value = {};
-        showRemoveButton.value = false;
+        modifiedFields.value = {};
+
+        editableRows.value.forEach((_, index) => validateRow(index));
       }
     },
     { immediate: true },
   );
-
-  watch(totalWithVAT, () => emitUpdate());
-  watch(totalVAT, () => emitUpdate());
 
   const getTableData = () => ({
     rows: [...editableRows.value],
@@ -192,8 +372,11 @@
     },
   });
 
-  const setData = (newData: KktTableRow[]) => {
-    editableRows.value = [...newData];
+  const setData = (newData: OverSumTableRow[]) => {
+    editableRows.value = newData.map(normalizeRowData);
+    invalidFields.value = {};
+    modifiedFields.value = {};
+    editableRows.value.forEach((_, index) => validateRow(index));
   };
 
   defineExpose({
@@ -234,7 +417,9 @@
             class="name-input"
             :class="[
               'name-input',
-              { [$style.errorInput]: invalidFields[index]?.includes('name') },
+              {
+                [$style.errorInput]: shouldShowError(index, 'name'),
+              },
             ]"
             @input="handleNameChange(index, $event)"
             @blur="finishNameEditing(index)"
@@ -254,13 +439,10 @@
             type="text"
             :value="row.amount_with_nds"
             placeholder="0,00"
-            required
             :class="[
               $style.inputField,
               {
                 [$style.errorInput]: shouldShowError(index, 'amount_with_nds'),
-                [$style.requiredField]:
-                  fieldValidations['amount_with_nds']?.required,
               },
             ]"
             @input="handleNumberInput($event, 'amount_with_nds', index)"
@@ -272,13 +454,10 @@
             type="text"
             :value="row.amount_nds"
             placeholder="0,00"
-            required
             :class="[
               $style.inputField,
               {
                 [$style.errorInput]: shouldShowError(index, 'amount_nds'),
-                [$style.requiredField]:
-                  fieldValidations['amount_nds']?.required,
               },
             ]"
             @input="handleNumberInput($event, 'amount_nds', index)"
@@ -296,7 +475,8 @@
           :max-files="3"
           :files="row.files || []"
           :file-ids="row.file_ids || []"
-          :is-required="true"
+          :is-required="hasAmountInRow(row, index)"
+          :has-error="shouldShowError(index, 'files')"
           @files-uploaded="
             ({ filesData }) => handleFileUploaded({ index, filesData })
           "
@@ -351,11 +531,27 @@
     }
   }
 
-  .requiredField:not(:focus):placeholder-shown {
-    border-color: var(--a-borderError);
+  .errorInput {
+    border-color: var(--a-borderError) !important;
+    background-color: var(--a-bgErrorLight) !important;
   }
 
-  .errorInput {
-    border-color: var(--a-borderError);
+  .name-input {
+    width: 100%;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--a-borderAccentLight);
+    background-color: var(--a-mainBg);
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: var(--a-borderAccent);
+    }
+
+    &.errorInput {
+      border-color: var(--a-borderError) !important;
+      background-color: var(--a-bgErrorLight) !important;
+    }
   }
 </style>

@@ -41,28 +41,26 @@
   const tableMessage = ref("");
   const showRemoveButton = ref(false);
   const invalidFields = ref<Record<number, string[]>>({});
+  const modifiedFields = ref<Record<number, Set<string>>>({});
+
+  const markFieldAsModified = (index: number, field: string) => {
+    if (!modifiedFields.value[index]) {
+      modifiedFields.value[index] = new Set();
+    }
+    modifiedFields.value[index].add(field);
+  };
 
   const fieldValidations = {
-    amount_with_nds: {
-      required: false,
-      validator: (value: string) => {
-        const num = parseFloat(value.replace(",", "."));
-        return !isNaN(num) && num >= 0;
-      },
+    amount_with_nds: (value: string) => {
+      const num = parseFloat(value.replace(",", "."));
+      return !isNaN(num) && num >= 0;
     },
-    amount_nds: {
-      required: false,
-      validator: (value: string) => {
-        const num = parseFloat(value.replace(",", "."));
-        return !isNaN(num) && num >= 0;
-      },
+    amount_nds: (value: string) => {
+      const num = parseFloat(value.replace(",", "."));
+      return !isNaN(num) && num >= 0;
     },
   } as const;
 
-  const numberErrors = ref<Record<number, string>>({});
-
-  const { handleNumberInput, handleNumberBlur, shouldShowError } =
-    useNumberFields(editableRows, numberErrors, fieldValidations);
   const { loading: fileLoading } = useSaveFile();
   const { handleFileUploaded, handleFileRemoved } =
     useFileHandling<NonCashTableRow>({
@@ -76,31 +74,133 @@
       }),
     });
 
+  const formatNumberInput = (value: string): string => {
+    // Удаляем все символы, кроме цифр, минуса и запятой
+    let cleaned = value.replace(/[^\d,-]/g, "");
+
+    const minusIndex = cleaned.indexOf("-");
+    if (minusIndex > 0) {
+      cleaned = cleaned.replace(/-/g, "");
+      cleaned = "-" + cleaned;
+    } else if (minusIndex === 0) {
+      cleaned = "-" + cleaned.replace(/-/g, "");
+    }
+
+    const commaIndex = cleaned.indexOf(",");
+    if (commaIndex !== -1) {
+      cleaned =
+        cleaned.slice(0, commaIndex + 1) +
+        cleaned.slice(commaIndex + 1).replace(/,/g, "");
+    }
+
+    return cleaned;
+  };
+
+  const formatNumberBlur = (value: string): string => {
+    if (!value) return "0,00";
+
+    if (!value.includes(",")) {
+      return `${value},00`;
+    }
+
+    const [integer, decimal] = value.split(",");
+    const paddedDecimal = (decimal || "").padEnd(2, "0").slice(0, 2);
+    return `${integer},${paddedDecimal}`;
+  };
+
+  const handleNumberInput = (
+    event: Event,
+    field: "amount_with_nds" | "amount_nds",
+    index: number,
+  ): void => {
+    const target = event.target as HTMLInputElement;
+    let value = target.value;
+
+    value = formatNumberInput(value);
+
+    editableRows.value[index][field] = value;
+    target.value = value;
+
+    markFieldAsModified(index, field);
+    validateRow(index);
+    emitUpdate();
+  };
+
+  const handleNumberBlur = (
+    field: "amount_with_nds" | "amount_nds",
+    index: number,
+  ): void => {
+    let value = editableRows.value[index][field];
+
+    value = formatNumberBlur(value);
+    editableRows.value[index][field] = value;
+
+    markFieldAsModified(index, field);
+    validateRow(index);
+    emitUpdate();
+  };
+
+  const shouldShowError = (
+    index: number,
+    field: "amount_with_nds" | "amount_nds" | "name" | "files",
+  ): boolean => {
+    return invalidFields.value[index]?.includes(field) || false;
+  };
+
   const validateRow = (index: number) => {
     const errors: string[] = [];
     const row = editableRows.value[index];
 
     const amountWithNds = row.amount_with_nds;
     const amountNds = row.amount_nds;
+    const name = row.name;
+    const hasFileIds = row.file_ids && row.file_ids.length > 0;
 
-    const hasAmountWithNds = amountWithNds && amountWithNds !== "0";
-    const hasAmountNds = amountNds && amountNds !== "0";
+    const hasAmountWithNds = amountWithNds && amountWithNds !== "0,00";
+    const hasAmountNds = amountNds && amountNds !== "0,00";
+    const hasName = name && name.trim() !== "";
 
-    if (
-      hasAmountWithNds &&
-      !fieldValidations.amount_with_nds.validator(amountWithNds)
-    ) {
+    // Валидация формата числовых полей
+    if (hasAmountWithNds && !fieldValidations.amount_with_nds(amountWithNds)) {
       errors.push("amount_with_nds");
     }
 
-    if (hasAmountNds && !fieldValidations.amount_nds.validator(amountNds)) {
+    if (hasAmountNds && !fieldValidations.amount_nds(amountNds)) {
       errors.push("amount_nds");
     }
 
-    // Валидация файлов - обязательна только если есть значения в числовых полях
-    const hasFileIds = row.file_ids && row.file_ids.length > 0;
-    if ((hasAmountWithNds || hasAmountNds) && !hasFileIds) {
-      errors.push("files");
+    const isNewlyAddedRow = addedRowsIndices.value.includes(index);
+    if (isNewlyAddedRow) {
+      // Для новых строк все поля обязательны
+      if (!hasName) errors.push("name");
+      if (!hasAmountWithNds) errors.push("amount_with_nds");
+      if (!hasAmountNds) errors.push("amount_nds");
+      if (!hasFileIds) errors.push("files");
+    } else {
+      // Для существующих строк проверяем только измененные поля
+      let hasNonEmptyModifiedField = false;
+      if (modifiedFields.value[index]) {
+        for (const field of modifiedFields.value[index]) {
+          if (field === "name" && hasName) hasNonEmptyModifiedField = true;
+          if (field === "amount_with_nds" && hasAmountWithNds)
+            hasNonEmptyModifiedField = true;
+          if (field === "amount_nds" && hasAmountNds)
+            hasNonEmptyModifiedField = true;
+        }
+      }
+
+      if (hasNonEmptyModifiedField) {
+        if (!hasName) errors.push("name");
+        if (!hasAmountWithNds) errors.push("amount_with_nds");
+        if (!hasAmountNds) errors.push("amount_nds");
+        if (!hasFileIds) errors.push("files");
+      }
+
+      // Очищаем modifiedFields если нет непустых измененных полей
+      if (modifiedFields.value[index] && !hasNonEmptyModifiedField) {
+        const { [index]: _, ...rest } = modifiedFields.value;
+        modifiedFields.value = rest;
+      }
     }
 
     invalidFields.value = {
@@ -111,24 +211,56 @@
     return errors.length === 0;
   };
 
+  const hasAmountInRow = (row: NonCashTableRow, index: number): boolean => {
+    const isNewlyAddedRow = addedRowsIndices.value.includes(index);
+    if (isNewlyAddedRow) return true;
+
+    let hasNonEmptyModifiedField = false;
+    if (modifiedFields.value[index]) {
+      const hasAmountWithNds =
+        row.amount_with_nds && row.amount_with_nds !== "0,00";
+      const hasAmountNds = row.amount_nds && row.amount_nds !== "0,00";
+      const hasName = row.name && row.name.trim() !== "";
+
+      for (const field of modifiedFields.value[index]) {
+        if (field === "name" && hasName) hasNonEmptyModifiedField = true;
+        if (field === "amount_with_nds" && hasAmountWithNds)
+          hasNonEmptyModifiedField = true;
+        if (field === "amount_nds" && hasAmountNds)
+          hasNonEmptyModifiedField = true;
+      }
+    }
+    return hasNonEmptyModifiedField;
+  };
+
   const { totalWithVAT, totalVAT } = useCashCalculations(editableRows);
 
-  // Методы
   const createEmptyRow = (): NonCashTableRow => ({
     id: "",
     name: "",
-    amount_with_nds: "0",
-    amount_nds: "0",
+    amount_with_nds: "0,00",
+    amount_nds: "0,00",
     file_ids: [],
     files: [],
     isNew: true,
   });
 
-  const normalizeRowData = (row: NonCashTableRow): NonCashTableRow => ({
-    ...createEmptyRow(),
-    ...row,
-    isNew: false,
-  });
+  const normalizeRowData = (row: NonCashTableRow): NonCashTableRow => {
+    const isApiData = !!(row.name && row.name.trim() !== "");
+    return {
+      ...createEmptyRow(),
+      ...row,
+      amount_with_nds:
+        typeof row.amount_with_nds === "number"
+          ? row.amount_with_nds.toFixed(2).replace(".", ",")
+          : row.amount_with_nds || "0,00",
+      amount_nds:
+        typeof row.amount_nds === "number"
+          ? row.amount_nds.toFixed(2).replace(".", ",")
+          : row.amount_nds || "0,00",
+      isNew: !isApiData,
+    };
+  };
 
   const emitUpdate = () => {
     emit("update:tableData", [...editableRows.value]);
@@ -150,6 +282,8 @@
     tableMessage.value = "Основание добавлено";
     emitUpdate();
     emit("rows-added", [newIndex]);
+
+    validateRow(newIndex);
   };
 
   const removeLastRow = () => {
@@ -166,6 +300,9 @@
     const { [lastAddedIndex]: _, ...rest } = invalidFields.value;
     invalidFields.value = rest;
 
+    const { [lastAddedIndex]: __, ...restModified } = modifiedFields.value;
+    modifiedFields.value = restModified;
+
     addedRowsIndices.value = currentIndices
       .filter((index) => index !== lastAddedIndex)
       .map((index) => (index > lastAddedIndex ? index - 1 : index));
@@ -179,15 +316,17 @@
   const handleNameChange = (index: number, event: Event) => {
     const target = event.target as HTMLInputElement;
     editableRows.value[index].name = target.value;
+    markFieldAsModified(index, "name");
     validateRow(index);
+    emitUpdate();
   };
 
   const finishNameEditing = (index: number) => {
     editingNameIndex.value = null;
     validateRow(index);
+    emitUpdate();
   };
 
-  // Watchers
   watch(
     () => props.initialData,
     (newData) => {
@@ -197,13 +336,13 @@
           : [createEmptyRow()];
         addedRowsIndices.value = [];
         invalidFields.value = {};
+        modifiedFields.value = {};
+
+        editableRows.value.forEach((_, index) => validateRow(index));
       }
     },
     { immediate: true },
   );
-
-  watch(totalWithVAT, () => emitUpdate());
-  watch(totalVAT, () => emitUpdate());
 
   const getTableData = () => ({
     rows: [...editableRows.value],
@@ -213,8 +352,11 @@
     },
   });
 
-  const setData = (newData: KktTableRow[]) => {
-    editableRows.value = [...newData];
+  const setData = (newData: NonCashTableRow[]) => {
+    editableRows.value = newData.map(normalizeRowData);
+    invalidFields.value = {};
+    modifiedFields.value = {};
+    editableRows.value.forEach((_, index) => validateRow(index));
   };
 
   defineExpose({
@@ -254,7 +396,9 @@
             class="name-input"
             :class="[
               'name-input',
-              { [$style.errorInput]: invalidFields[index]?.includes('name') },
+              {
+                [$style.errorInput]: shouldShowError(index, 'name'),
+              },
             ]"
             @input="handleNameChange(index, $event)"
             @blur="finishNameEditing(index)"
@@ -308,7 +452,8 @@
           :max-files="3"
           :files="row.files || []"
           :file-ids="row.file_ids || []"
-          :is-required="row.amount_with_nds > 0"
+          :is-required="hasAmountInRow(row, index)"
+          :has-error="shouldShowError(index, 'files')"
           @files-uploaded="
             ({ filesData }) => handleFileUploaded({ index, filesData })
           "
@@ -360,6 +505,26 @@
   }
 
   .errorInput {
-    border-color: var(--a-borderError);
+    border-color: var(--a-borderError) !important;
+    background-color: var(--a-bgErrorLight) !important;
+  }
+
+  .name-input {
+    width: 100%;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--a-borderAccentLight);
+    background-color: var(--a-mainBg);
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: var(--a-borderAccent);
+    }
+
+    &.errorInput {
+      border-color: var(--a-borderError) !important;
+      background-color: var(--a-bgErrorLight) !important;
+    }
   }
 </style>
