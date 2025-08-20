@@ -29,6 +29,16 @@
   const isError = ref(false);
   const invalidFields = ref<Record<string, boolean>>({});
 
+  const hasChanges = computed(() => {
+    if (kktData.value && allTables.value.length !== kktData.value.length) {
+      return true;
+    }
+
+    return allTables.value.some((table) => table.isDirty || table.isCustom);
+  });
+
+  const { setupGuard } = useUnsavedChangesGuard(hasChanges);
+
   const addBlock = () => {
     const blockNumber = allTables.value.length + 1;
     const name = `Касса ${blockNumber}`;
@@ -227,14 +237,6 @@
     });
   });
 
-  const hasChanges = computed(() => {
-    if (kktData.value && allTables.value.length !== kktData.value.length) {
-      return true;
-    }
-
-    return allTables.value.some((table) => table.isDirty || table.isCustom);
-  });
-
   const showMessage = (message: string, error = false) => {
     saveMessage.value = message;
     isError.value = error;
@@ -242,6 +244,8 @@
       saveMessage.value = "";
     }, 5000);
   };
+
+  let cleanupGuard: (() => void) | null = null;
 
   onMounted(async () => {
     try {
@@ -254,9 +258,17 @@
           isCustom: false,
         }));
       }
+
+      cleanupGuard = setupGuard();
     } catch (err) {
       console.error("Ошибка загрузки данных:", err);
       showMessage("Ошибка при загрузке данных ККТ", true);
+    }
+  });
+
+  onUnmounted(() => {
+    if (cleanupGuard) {
+      cleanupGuard();
     }
   });
 </script>
