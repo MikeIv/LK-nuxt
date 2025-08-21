@@ -52,12 +52,14 @@
 
   const fieldValidations = {
     amount_with_nds: (value: string) => {
+      if (value === "0,00") return true;
       const num = parseFloat(value.replace(",", "."));
-      return !isNaN(num) && num >= 0;
+      return !isNaN(num) && num > 0;
     },
     amount_nds: (value: string) => {
+      if (value === "0,00") return true;
       const num = parseFloat(value.replace(",", "."));
-      return !isNaN(num) && num >= 0;
+      return !isNaN(num) && num > 0;
     },
   } as const;
 
@@ -74,40 +76,6 @@
       }),
     });
 
-  const formatNumberInput = (value: string): string => {
-    // Удаляем все символы, кроме цифр, минуса и запятой
-    let cleaned = value.replace(/[^\d,-]/g, "");
-
-    const minusIndex = cleaned.indexOf("-");
-    if (minusIndex > 0) {
-      cleaned = cleaned.replace(/-/g, "");
-      cleaned = "-" + cleaned;
-    } else if (minusIndex === 0) {
-      cleaned = "-" + cleaned.replace(/-/g, "");
-    }
-
-    const commaIndex = cleaned.indexOf(",");
-    if (commaIndex !== -1) {
-      cleaned =
-        cleaned.slice(0, commaIndex + 1) +
-        cleaned.slice(commaIndex + 1).replace(/,/g, "");
-    }
-
-    return cleaned;
-  };
-
-  const formatNumberBlur = (value: string): string => {
-    if (!value) return "0,00";
-
-    if (!value.includes(",")) {
-      return `${value},00`;
-    }
-
-    const [integer, decimal] = value.split(",");
-    const paddedDecimal = (decimal || "").padEnd(2, "0").slice(0, 2);
-    return `${integer},${paddedDecimal}`;
-  };
-
   const handleNumberInput = (
     event: Event,
     field: "amount_with_nds" | "amount_nds",
@@ -116,7 +84,19 @@
     const target = event.target as HTMLInputElement;
     let value = target.value;
 
-    value = formatNumberInput(value);
+    value = value.replace(/[^\d,]/g, "");
+
+    const commaParts = value.split(",");
+    if (commaParts.length > 2) {
+      value = commaParts[0] + "," + commaParts.slice(1).join("");
+    }
+
+    if (value.includes(",")) {
+      const [integer, decimal] = value.split(",");
+      if (decimal && decimal.length > 2) {
+        value = integer + "," + decimal.slice(0, 2);
+      }
+    }
 
     editableRows.value[index][field] = value;
     target.value = value;
@@ -132,9 +112,26 @@
   ): void => {
     let value = editableRows.value[index][field];
 
-    value = formatNumberBlur(value);
-    editableRows.value[index][field] = value;
+    if (!value || value === ",") {
+      value = "0,00";
+    } else {
+      if (!value.includes(",")) {
+        value = value + ",00";
+      } else {
+        const [integer, decimal] = value.split(",");
+        const paddedDecimal = (decimal || "").padEnd(2, "0").slice(0, 2);
+        value = integer + "," + paddedDecimal;
+      }
 
+      if (value.startsWith("0") && value.length > 1 && value[1] !== ",") {
+        value = value.replace(/^0+/, "");
+        if (value === "" || value.startsWith(",")) {
+          value = "0" + value;
+        }
+      }
+    }
+
+    editableRows.value[index][field] = value;
     markFieldAsModified(index, field);
     validateRow(index);
     emitUpdate();
@@ -156,48 +153,76 @@
     const name = row.name;
     const hasFileIds = row.file_ids && row.file_ids.length > 0;
 
-    const hasAmountWithNds = amountWithNds && amountWithNds !== "0,00";
-    const hasAmountNds = amountNds && amountNds !== "0,00";
-    const hasName = name && name.trim() !== "";
-
-    // Валидация формата числовых полей
-    if (hasAmountWithNds && !fieldValidations.amount_with_nds(amountWithNds)) {
+    // Валидация числовых полей (проверяем только если значение не пустое и не "0,00")
+    if (
+      amountWithNds &&
+      amountWithNds !== "0,00" &&
+      !fieldValidations.amount_with_nds(amountWithNds)
+    ) {
       errors.push("amount_with_nds");
     }
 
-    if (hasAmountNds && !fieldValidations.amount_nds(amountNds)) {
+    if (
+      amountNds &&
+      amountNds !== "0,00" &&
+      !fieldValidations.amount_nds(amountNds)
+    ) {
       errors.push("amount_nds");
     }
 
     const isNewlyAddedRow = addedRowsIndices.value.includes(index);
     if (isNewlyAddedRow) {
       // Для новых строк все поля обязательны
-      if (!hasName) errors.push("name");
-      if (!hasAmountWithNds) errors.push("amount_with_nds");
-      if (!hasAmountNds) errors.push("amount_nds");
+      if (!name || name.trim() === "") errors.push("name");
+      if (!amountWithNds || amountWithNds === "0,00")
+        errors.push("amount_with_nds");
+      if (!amountNds || amountNds === "0,00") errors.push("amount_nds");
       if (!hasFileIds) errors.push("files");
     } else {
       // Для существующих строк проверяем только измененные поля
       let hasNonEmptyModifiedField = false;
-      if (modifiedFields.value[index]) {
-        for (const field of modifiedFields.value[index]) {
-          if (field === "name" && hasName) hasNonEmptyModifiedField = true;
-          if (field === "amount_with_nds" && hasAmountWithNds)
+      const modifiedFieldsForRow = modifiedFields.value[index];
+
+      if (modifiedFieldsForRow) {
+        for (const field of modifiedFieldsForRow) {
+          if (field === "name" && name && name.trim() !== "")
             hasNonEmptyModifiedField = true;
-          if (field === "amount_nds" && hasAmountNds)
+          if (
+            field === "amount_with_nds" &&
+            amountWithNds &&
+            amountWithNds !== "0,00"
+          )
+            hasNonEmptyModifiedField = true;
+          if (field === "amount_nds" && amountNds && amountNds !== "0,00")
             hasNonEmptyModifiedField = true;
         }
       }
 
       if (hasNonEmptyModifiedField) {
-        if (!hasName) errors.push("name");
-        if (!hasAmountWithNds) errors.push("amount_with_nds");
-        if (!hasAmountNds) errors.push("amount_nds");
+        // Проверяем только те поля, которые были изменены ИЛИ связанные обязательные поля
+        if (
+          modifiedFieldsForRow?.has("name") &&
+          (!name || name.trim() === "")
+        ) {
+          errors.push("name");
+        }
+        if (
+          modifiedFieldsForRow?.has("amount_with_nds") &&
+          (!amountWithNds || amountWithNds === "0,00")
+        ) {
+          errors.push("amount_with_nds");
+        }
+        if (
+          modifiedFieldsForRow?.has("amount_nds") &&
+          (!amountNds || amountNds === "0,00")
+        ) {
+          errors.push("amount_nds");
+        }
         if (!hasFileIds) errors.push("files");
       }
 
       // Очищаем modifiedFields если нет непустых измененных полей
-      if (modifiedFields.value[index] && !hasNonEmptyModifiedField) {
+      if (modifiedFieldsForRow && !hasNonEmptyModifiedField) {
         const { [index]: _, ...rest } = modifiedFields.value;
         modifiedFields.value = rest;
       }

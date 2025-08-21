@@ -43,7 +43,6 @@
   const invalidFields = ref<Record<number, string[]>>({});
   const modifiedFields = ref<Record<number, Set<string>>>({});
 
-  // Функция для отметки поля как измененного
   const markFieldAsModified = (index: number, field: string) => {
     if (!modifiedFields.value[index]) {
       modifiedFields.value[index] = new Set();
@@ -51,7 +50,6 @@
     modifiedFields.value[index].add(field);
   };
 
-  // Валидаторы только формата (без обязательности)
   const fieldValidations = {
     amount_with_nds: (value: string) => {
       const num = parseFloat(value.replace(",", "."));
@@ -69,12 +67,21 @@
     index: number,
   ) => {
     const target = event.target as HTMLInputElement;
-    // Разрешаем только цифры, запятую и точку
-    let value = target.value.replace(/[^\d,.]/g, "");
+    let value = target.value;
 
-    const hasDecimal = /[,.]/.test(value);
+    value = value.replace(/\./g, ",");
+
+    value = value.replace(/[^\d,]/g, "");
+
+    const decimalParts = value.split(",");
+    if (decimalParts.length > 1 && decimalParts[1].length > 2) {
+      decimalParts[1] = decimalParts[1].substring(0, 2);
+      value = decimalParts.join(",");
+    }
+
+    const hasDecimal = /,/.test(value);
     if (hasDecimal) {
-      value = value.replace(/[,.]/g, (match, offset) => {
+      value = value.replace(/,/g, (match, offset) => {
         return offset === value.indexOf(match) ? match : "";
       });
     }
@@ -91,8 +98,26 @@
   ) => {
     const value = editableRows.value[index][field];
 
-    if (value && value.includes(",")) {
-      editableRows.value[index][field] = value.replace(",", ".");
+    if (value) {
+      let processedValue = value;
+
+      const parts = processedValue.split(",");
+      if (parts.length > 1 && parts[1].length > 2) {
+        parts[1] = parts[1].substring(0, 2);
+        processedValue = parts.join(",");
+      }
+
+      if (parts.length === 1 && parts[0] !== "") {
+        processedValue = parts[0] + ",00";
+      }
+
+      if (processedValue.startsWith(",")) {
+        processedValue = "0" + processedValue;
+      }
+
+      processedValue = processedValue.replace(/\./g, ",");
+
+      editableRows.value[index][field] = processedValue;
     }
 
     markFieldAsModified(index, field);
@@ -146,18 +171,32 @@
     const settlementAccount = row.settlement_account_number;
     const name = row.name;
 
-    const hasAmountWithNds = amountWithNds && amountWithNds !== "0";
-    const hasAmountNds = amountNds && amountNds !== "0";
+    // Исправленные проверки - учитываем "0" как валидное значение
+    const hasAmountWithNds =
+      amountWithNds !== undefined &&
+      amountWithNds !== "" &&
+      amountWithNds !== "0";
+    const hasAmountNds =
+      amountNds !== undefined && amountNds !== "" && amountNds !== "0";
     const hasSettlementAccount =
       settlementAccount && settlementAccount.trim() !== "";
     const hasName = name && name.trim() !== "";
     const hasFileIds = row.file_ids && row.file_ids.length > 0;
 
-    if (hasAmountWithNds && !fieldValidations.amount_with_nds(amountWithNds)) {
+    // Валидация числовых полей (только если они не пустые и не "0")
+    if (
+      amountWithNds &&
+      amountWithNds !== "0" &&
+      !fieldValidations.amount_with_nds(amountWithNds)
+    ) {
       errors.push("amount_with_nds");
     }
 
-    if (hasAmountNds && !fieldValidations.amount_nds(amountNds)) {
+    if (
+      amountNds &&
+      amountNds !== "0" &&
+      !fieldValidations.amount_nds(amountNds)
+    ) {
       errors.push("amount_nds");
     }
 
@@ -214,8 +253,11 @@
     let hasNonEmptyModifiedField = false;
     if (modifiedFields.value[index]) {
       const hasAmountWithNds =
-        row.amount_with_nds && row.amount_with_nds !== "0";
-      const hasAmountNds = row.amount_nds && row.amount_nds !== "0";
+        row.amount_with_nds &&
+        row.amount_with_nds !== "" &&
+        row.amount_with_nds !== "0";
+      const hasAmountNds =
+        row.amount_nds && row.amount_nds !== "" && row.amount_nds !== "0";
       const hasSettlementAccount =
         row.settlement_account_number &&
         row.settlement_account_number.trim() !== "";

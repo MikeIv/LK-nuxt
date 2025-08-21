@@ -3,11 +3,10 @@
   import { useUserStore } from "~/stores/userData";
   import { useApi } from "~/composables/useApi";
   import { useStepTwoStore } from "~/stores/stepTwo";
+  import { useUserData } from "../../composables/useUser";
 
-  // Используем стор для получения данных
   const userStore = useUserStore();
-  // Используем composable для методов
-  const { fetchUser, changeContract } = useUserData();
+  const { fetchUser } = useUserData();
 
   const authStore = useAuthStore();
   const { isLoading, error } = useApi<unknown>();
@@ -90,13 +89,10 @@
 
   const hasContractsToShow = computed(() => filteredContracts.value.length > 0);
 
-  const handleContractChange = async (contractId: number) => {
+  const handleContractChange = async () => {
     try {
       isLoading.value = true;
       error.value = null;
-
-      // Используем метод из composable, который обновит стор userData
-      await changeContract(contractId);
 
       await refreshNuxtData();
       await navigateTo({ path: "/" }, { replace: true });

@@ -84,7 +84,6 @@ export const useNumberFields = (
 
     validateField(field, index);
 
-    // Специальная валидация для показаний счетчика
     if (field === "start_meter_reading" || field === "end_meter_reading") {
       validateMeterReadings(index);
     }
@@ -97,21 +96,15 @@ export const useNumberFields = (
 
     // Проверка на обязательность
     if (rules.required && !value) {
-      error = "Поле обязательно для заполнения";
-    }
-    // Проверка на ноль (если не разрешено)
-    else if (value === "0,00" && !rules.allowZero && rules.required) {
+      error = "";
+    } else if (value === "0,00" && !rules.allowZero && rules.required) {
       error = "Значение не может быть нулевым";
-    }
-    // Проверка минимального значения
-    else if (rules.min !== undefined && value) {
+    } else if (rules.min !== undefined && value) {
       const numValue = parseFloat(value.replace(",", "."));
       if (numValue < rules.min) {
         error = `Значение не может быть меньше ${rules.min.toFixed(2).replace(".", ",")}`;
       }
-    }
-    // Проверка максимального значения
-    else if (rules.max !== undefined && value) {
+    } else if (rules.max !== undefined && value) {
       const numValue = parseFloat(value.replace(",", "."));
       if (numValue > rules.max) {
         error = `Значение не может быть больше ${rules.max.toFixed(2).replace(".", ",")}`;

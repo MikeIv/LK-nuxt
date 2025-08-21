@@ -79,7 +79,7 @@ export const useKktInput = (
 
     // Валидация на обязательность поля
     if (!validateRequired(kktNumber)) {
-      kktErrors.value[index] = "Поле обязательно для заполнения";
+      kktErrors.value[index] = "";
       return false;
     }
 

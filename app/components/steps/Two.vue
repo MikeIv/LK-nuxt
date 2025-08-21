@@ -7,6 +7,15 @@
     navigateTo("/record/1");
   };
 
+  const userStore = useUserStore();
+  const stepOneStore = useStepOneStore();
+  const stepTwoStore = useStepTwoStore();
+
+  // Безопасное логирование
+  console.log("userStore user:", userStore.user);
+  console.log("userStore isLoading:", userStore.isLoading);
+  console.log("stepOne dateRange", stepOneStore.dateRange);
+
   const {
     callApi: loadReport,
     data: report,
@@ -14,6 +23,11 @@
     error,
   } = useApi<UserData>();
 
+  // Добавляем ref для отслеживания готовности данных
+  const isUserReady = ref(false);
+  const loadError = ref<string | null>(null);
+
+  // Computed свойства для табличных данных
   const tableKkt = computed(() => report.value?.report?.kkts || {});
   const tableCashKkt = computed(
     () => report.value?.report?.cash_turnovers_without_kkt || {},
@@ -25,14 +39,13 @@
     () => report.value?.report?.cash_turnovers_other || {},
   );
 
-  const stepOneStore = useStepOneStore();
-  const stepTwoStore = useStepTwoStore();
-
+  // Refs для таблиц
   const kktTableRef = ref();
   const cashKktTableRef = ref();
   const nonCashTableRef = ref();
   const otherSumTableRef = ref();
 
+  // Валидация формы
   const { validateForm } = useFormValidation(
     kktTableRef,
     cashKktTableRef,
@@ -41,7 +54,6 @@
   );
 
   const validationResult = computed(() => validateForm());
-
   const isFormValid = computed(() => validationResult.value.isValid);
   const validationError = ref("");
 
@@ -53,6 +65,7 @@
     { immediate: true },
   );
 
+  // Функции для работы с данными
   const { isSaving, saveReport, updateStores } = useSaveReport({
     kktTableRef,
     cashKktTableRef,
@@ -63,6 +76,67 @@
     loadReport,
   });
 
+  // Функция для форматирования даты
+  const formatDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  // Оптимизированная функция загрузки отчета
+  const loadReportWithHeaders = async () => {
+    try {
+      // Проверяем что пользователь загружен
+      if (!userStore.user?.id) {
+        console.error("User ID not found");
+        loadError.value = "Данные пользователя не загружены";
+        return null;
+      }
+
+      const headers = {
+        "contract-id": userStore.user.id.toString(),
+      };
+
+      console.log("Sending contract-id header:", headers["contract-id"]);
+
+      // Предварительно вычисляем даты
+      const params: Record<string, string> = {};
+
+      if (stepOneStore.dateRange?.[0]) {
+        const startDate = new Date(stepOneStore.dateRange[0]);
+        params.start = formatDate(startDate);
+      }
+
+      if (stepOneStore.dateRange?.[1]) {
+        const endDate = new Date(stepOneStore.dateRange[1]);
+        params.end = formatDate(endDate);
+      }
+
+      console.log("Request params:", params);
+
+      return await loadReport("/tenants/reports/-1", {
+        method: "GET",
+        headers,
+        params: Object.keys(params).length > 0 ? params : undefined,
+      });
+    } catch (err) {
+      console.error("Error loading report:", err);
+      loadError.value = "Ошибка загрузки отчета";
+      return null;
+    }
+  };
+
+  // Функция установки данных в таблицы
+  const setTableData = (ref: unknown, storeData: unknown, apiData: unknown) => {
+    if (storeData?.rows?.length > 0) {
+      ref.value?.setData?.(storeData.rows);
+    } else if (apiData?.body?.length > 0) {
+      ref.value?.setData?.(apiData.body);
+    }
+  };
+
+  // Обработчики событий
   const validateAndNext = () => {
     if (!isFormValid.value) {
       console.error("Ошибка валидации данных:", validationError.value);
@@ -76,8 +150,7 @@
       otherSum: otherSumTableRef.value?.getTableData(),
     };
 
-    console.log("tablesData@@@", tablesData);
-
+    console.log("tablesData", tablesData);
     updateStores(tablesData);
     navigateTo("/record/3");
   };
@@ -116,61 +189,86 @@
     checkDataChanges();
   };
 
+  // Отслеживаем загрузку пользователя
+  watch(
+    () => userStore.user,
+    (newUser) => {
+      if (newUser) {
+        isUserReady.value = true;
+        console.log("User data loaded:", newUser.id);
+      }
+    },
+    { immediate: true },
+  );
+
+  // Lifecycle hooks
   onMounted(async () => {
     try {
-      await loadReport("/tenants/reports/-1");
+      // Ждем загрузки пользователя
+      if (!userStore.user && userStore.isLoading) {
+        console.log("Waiting for user data to load...");
+
+        // Ждем максимум 10 секунд
+        await new Promise((resolve, reject) => {
+          const unwatch = watch(
+            () => userStore.user,
+            (user) => {
+              if (user) {
+                unwatch();
+                resolve(true);
+              }
+            },
+          );
+
+          setTimeout(() => {
+            unwatch();
+            reject(new Error("Timeout waiting for user data"));
+          }, 10000);
+        });
+      }
+
+      if (!userStore.user) {
+        throw new Error("Данные пользователя не загружены");
+      }
+
+      await loadReportWithHeaders();
       await nextTick();
 
-      if (stepTwoStore.kkt.rows.length > 0) {
-        kktTableRef.value?.setData?.(stepTwoStore.kkt.rows);
-      } else if (tableKkt.value?.body?.length > 0) {
-        kktTableRef.value?.setData?.(tableKkt.value.body);
-      }
-
-      if (stepTwoStore.cashKkt.rows.length > 0) {
-        cashKktTableRef.value?.setData?.(stepTwoStore.cashKkt.rows);
-      } else if (tableCashKkt.value?.body?.length > 0) {
-        cashKktTableRef.value?.setData?.(tableCashKkt.value.body);
-      }
-
-      if (stepTwoStore.nonCash.rows.length > 0) {
-        nonCashTableRef.value?.setData?.(stepTwoStore.nonCash.rows);
-      } else if (tableNonCash.value?.body?.length > 0) {
-        nonCashTableRef.value?.setData?.(tableNonCash.value.body);
-      }
-
-      if (stepTwoStore.otherSum.rows.length > 0) {
-        otherSumTableRef.value?.setData?.(stepTwoStore.otherSum.rows);
-      } else if (tableOtherSum.value?.body?.length > 0) {
-        otherSumTableRef.value?.setData?.(tableOtherSum.value.body);
-      }
-
-      kktTableRef.value?.$el?.addEventListener("change", handleTableChange);
-      cashKktTableRef.value?.$el?.addEventListener("change", handleTableChange);
-      nonCashTableRef.value?.$el?.addEventListener("change", handleTableChange);
-      otherSumTableRef.value?.$el?.addEventListener(
-        "change",
-        handleTableChange,
+      // Устанавливаем данные в таблицы
+      setTableData(kktTableRef, stepTwoStore.kkt, tableKkt.value);
+      setTableData(cashKktTableRef, stepTwoStore.cashKkt, tableCashKkt.value);
+      setTableData(nonCashTableRef, stepTwoStore.nonCash, tableNonCash.value);
+      setTableData(
+        otherSumTableRef,
+        stepTwoStore.otherSum,
+        tableOtherSum.value,
       );
     } catch (error) {
       console.error("Ошибка при загрузке данных:", error);
+      loadError.value = error.message;
+
+      // Показываем уведомление пользователю
+      useToast().add({
+        title: "Ошибка загрузки",
+        description: error.message,
+        color: "red",
+        icon: "i-heroicons-exclamation-triangle",
+      });
     }
   });
 
   onBeforeUnmount(() => {
-    kktTableRef.value?.$el?.removeEventListener("change", handleTableChange);
-    cashKktTableRef.value?.$el?.removeEventListener(
-      "change",
-      handleTableChange,
-    );
-    nonCashTableRef.value?.$el?.removeEventListener(
-      "change",
-      handleTableChange,
-    );
-    otherSumTableRef.value?.$el?.removeEventListener(
-      "change",
-      handleTableChange,
-    );
+    // Убираем обработчики событий
+    const refs = [
+      kktTableRef,
+      cashKktTableRef,
+      nonCashTableRef,
+      otherSumTableRef,
+    ];
+
+    refs.forEach((ref) => {
+      ref.value?.$el?.removeEventListener("change", handleTableChange);
+    });
   });
 </script>
 
@@ -185,7 +283,7 @@
     <StepsCoreMain>
       <section :class="$style.wrapper">
         <StepsCoreContentTitle
-          text="2.1 Денежный оборот, полученный при расчетах с использованием ККТ, установленных в Помещении"
+          text="2.1 Денечный оборот, полученный при расчетах с использованием ККТ, установленных в Помещении"
         />
         <div class="table-container">
           <StepsTablesKkt
@@ -194,13 +292,14 @@
             :initial-data="tableKkt?.body"
             :loading="isLoading"
             :error="error"
+            @change="handleTableChange"
           />
         </div>
       </section>
 
       <section :class="$style.wrapper">
         <StepsCoreContentTitle
-          text="2.2 Денежный оборот, полученный на расчетные счета Арендатора без использования ККТ, установленных в Помещении"
+          text="2.2 Денечный оборот, полученный на расчетные счета Арендатора без использования ККТ, установленных в Помещении"
         />
         <div class="table-container">
           <StepsTablesCashKkt
@@ -209,13 +308,14 @@
             :initial-data="tableCashKkt?.body"
             :loading="isLoading"
             :error="error"
+            @change="handleTableChange"
           />
         </div>
       </section>
 
       <section :class="$style.wrapper">
         <StepsCoreContentTitle
-          text="2.3 Денежный оборот, полученный в качестве неденежных форм расчетов"
+          text="2.3 Денечный оборот, полученный в качестве неденежных форм расчетов"
         />
         <div class="table-container">
           <StepsTablesNonCash
@@ -224,13 +324,14 @@
             :initial-data="tableNonCash?.body"
             :loading="isLoading"
             :error="error"
+            @change="handleTableChange"
           />
         </div>
       </section>
 
       <section :class="$style.wrapper">
         <StepsCoreContentTitle
-          text="2.4 Иные суммы, подлежащие включению в Денежный оборот в Помещении"
+          text="2.4 Иные суммы, подлежащие включению в Денечный оборот в Помещении"
         />
         <div class="table-container">
           <StepsTablesOtherSum
@@ -239,6 +340,7 @@
             :initial-data="tableOtherSum?.body"
             :loading="isLoading"
             :error="error"
+            @change="handleTableChange"
           />
         </div>
       </section>

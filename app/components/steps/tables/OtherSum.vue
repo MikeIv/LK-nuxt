@@ -52,47 +52,16 @@
 
   const fieldValidations = {
     amount_with_nds: (value: string) => {
+      if (value === "0,00") return true;
       const num = parseFloat(value.replace(",", "."));
-      return !isNaN(num) && num >= 0;
+      return !isNaN(num) && num > 0;
     },
     amount_nds: (value: string) => {
+      if (value === "0,00") return true;
       const num = parseFloat(value.replace(",", "."));
-      return !isNaN(num) && num >= 0;
+      return !isNaN(num) && num > 0;
     },
   } as const;
-
-  const formatNumberInput = (value: string): string => {
-    let cleaned = value.replace(/[^\d,-]/g, "");
-
-    const minusIndex = cleaned.indexOf("-");
-    if (minusIndex > 0) {
-      cleaned = cleaned.replace(/-/g, "");
-      cleaned = "-" + cleaned;
-    } else if (minusIndex === 0) {
-      cleaned = "-" + cleaned.replace(/-/g, "");
-    }
-
-    const commaIndex = cleaned.indexOf(",");
-    if (commaIndex !== -1) {
-      cleaned =
-        cleaned.slice(0, commaIndex + 1) +
-        cleaned.slice(commaIndex + 1).replace(/,/g, "");
-    }
-
-    return cleaned;
-  };
-
-  const formatNumberBlur = (value: string): string => {
-    if (!value) return "0,00";
-
-    if (!value.includes(",")) {
-      return `${value},00`;
-    }
-
-    const [integer, decimal] = value.split(",");
-    const paddedDecimal = (decimal || "").padEnd(2, "0").slice(0, 2);
-    return `${integer},${paddedDecimal}`;
-  };
 
   const handleNumberInput = (
     event: Event,
@@ -102,7 +71,19 @@
     const target = event.target as HTMLInputElement;
     let value = target.value;
 
-    value = formatNumberInput(value);
+    value = value.replace(/[^\d,]/g, "");
+
+    const commaParts = value.split(",");
+    if (commaParts.length > 2) {
+      value = commaParts[0] + "," + commaParts.slice(1).join("");
+    }
+
+    if (value.includes(",")) {
+      const [integer, decimal] = value.split(",");
+      if (decimal && decimal.length > 2) {
+        value = integer + "," + decimal.slice(0, 2);
+      }
+    }
 
     editableRows.value[index][field] = value;
     target.value = value;
@@ -118,9 +99,26 @@
   ): void => {
     let value = editableRows.value[index][field];
 
-    value = formatNumberBlur(value);
-    editableRows.value[index][field] = value;
+    if (!value || value === ",") {
+      value = "0,00";
+    } else {
+      if (!value.includes(",")) {
+        value = value + ",00";
+      } else {
+        const [integer, decimal] = value.split(",");
+        const paddedDecimal = (decimal || "").padEnd(2, "0").slice(0, 2);
+        value = integer + "," + paddedDecimal;
+      }
 
+      if (value.startsWith("0") && value.length > 1 && value[1] !== ",") {
+        value = value.replace(/^0+/, "");
+        if (value === "" || value.startsWith(",")) {
+          value = "0" + value;
+        }
+      }
+    }
+
+    editableRows.value[index][field] = value;
     markFieldAsModified(index, field);
     validateRow(index);
     emitUpdate();
