@@ -151,7 +151,7 @@
     handleKktInput,
     validateKktNumber,
     shouldShowError: shouldShowErrorKkt,
-    preventNonNumericInput, // Импортируем новую функцию
+    preventNonNumericInput,
   } = useKktInput(editableRows, kktErrors, emit);
 
   const fieldValidations = {
@@ -236,7 +236,7 @@
           inputmode="numeric"
           pattern="[0-9]*"
           required
-          :readonly="!addedRowsIndices.includes(index)"
+          :disabled="!addedRowsIndices.includes(index)"
           class="kkt-table__input-reg-number"
           :class="[
             {

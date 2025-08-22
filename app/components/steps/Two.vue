@@ -11,7 +11,6 @@
   const stepOneStore = useStepOneStore();
   const stepTwoStore = useStepTwoStore();
 
-  // Безопасное логирование
   console.log("userStore user:", userStore.user);
   console.log("userStore isLoading:", userStore.isLoading);
   console.log("stepOne dateRange", stepOneStore.dateRange);
@@ -23,11 +22,9 @@
     error,
   } = useApi<UserData>();
 
-  // Добавляем ref для отслеживания готовности данных
   const isUserReady = ref(false);
   const loadError = ref<string | null>(null);
 
-  // Computed свойства для табличных данных
   const tableKkt = computed(() => report.value?.report?.kkts || {});
   const tableCashKkt = computed(
     () => report.value?.report?.cash_turnovers_without_kkt || {},
@@ -39,13 +36,11 @@
     () => report.value?.report?.cash_turnovers_other || {},
   );
 
-  // Refs для таблиц
   const kktTableRef = ref();
   const cashKktTableRef = ref();
   const nonCashTableRef = ref();
   const otherSumTableRef = ref();
 
-  // Валидация формы
   const { validateForm } = useFormValidation(
     kktTableRef,
     cashKktTableRef,
@@ -65,18 +60,19 @@
     { immediate: true },
   );
 
-  // Функции для работы с данными
   const { isSaving, saveReport, updateStores } = useSaveReport({
-    kktTableRef,
-    cashKktTableRef,
-    nonCashTableRef,
-    otherSumTableRef,
+    tableRefs: {
+      kkt: kktTableRef,
+      cashKkt: cashKktTableRef,
+      nonCash: nonCashTableRef,
+      otherSum: otherSumTableRef,
+    },
     stepOneStore,
-    stepTwoStore,
+    store: stepTwoStore,
     loadReport,
+    stepType: "stepTwo",
   });
 
-  // Функция для форматирования даты
   const formatDate = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -84,10 +80,8 @@
     return `${year}-${month}-${day}`;
   };
 
-  // Оптимизированная функция загрузки отчета
   const loadReportWithHeaders = async () => {
     try {
-      // Проверяем что пользователь загружен
       if (!userStore.user?.id) {
         console.error("User ID not found");
         loadError.value = "Данные пользователя не загружены";
@@ -100,7 +94,6 @@
 
       console.log("Sending contract-id header:", headers["contract-id"]);
 
-      // Предварительно вычисляем даты
       const params: Record<string, string> = {};
 
       if (stepOneStore.dateRange?.[0]) {
@@ -127,7 +120,6 @@
     }
   };
 
-  // Функция установки данных в таблицы
   const setTableData = (ref: unknown, storeData: unknown, apiData: unknown) => {
     if (storeData?.rows?.length > 0) {
       ref.value?.setData?.(storeData.rows);
@@ -136,7 +128,6 @@
     }
   };
 
-  // Обработчики событий
   const validateAndNext = () => {
     if (!isFormValid.value) {
       console.error("Ошибка валидации данных:", validationError.value);
@@ -189,7 +180,6 @@
     checkDataChanges();
   };
 
-  // Отслеживаем загрузку пользователя
   watch(
     () => userStore.user,
     (newUser) => {
@@ -201,14 +191,11 @@
     { immediate: true },
   );
 
-  // Lifecycle hooks
   onMounted(async () => {
     try {
-      // Ждем загрузки пользователя
       if (!userStore.user && userStore.isLoading) {
         console.log("Waiting for user data to load...");
 
-        // Ждем максимум 10 секунд
         await new Promise((resolve, reject) => {
           const unwatch = watch(
             () => userStore.user,
@@ -234,7 +221,6 @@
       await loadReportWithHeaders();
       await nextTick();
 
-      // Устанавливаем данные в таблицы
       setTableData(kktTableRef, stepTwoStore.kkt, tableKkt.value);
       setTableData(cashKktTableRef, stepTwoStore.cashKkt, tableCashKkt.value);
       setTableData(nonCashTableRef, stepTwoStore.nonCash, tableNonCash.value);
@@ -258,7 +244,6 @@
   });
 
   onBeforeUnmount(() => {
-    // Убираем обработчики событий
     const refs = [
       kktTableRef,
       cashKktTableRef,
@@ -283,7 +268,7 @@
     <StepsCoreMain>
       <section :class="$style.wrapper">
         <StepsCoreContentTitle
-          text="2.1 Денечный оборот, полученный при расчетах с использованием ККТ, установленных в Помещении"
+          text="2.1 Денежный оборот, полученный при расчетах с использованием ККТ, установленных в Помещении"
         />
         <div class="table-container">
           <StepsTablesKkt
@@ -299,7 +284,7 @@
 
       <section :class="$style.wrapper">
         <StepsCoreContentTitle
-          text="2.2 Денечный оборот, полученный на расчетные счета Арендатора без использования ККТ, установленных в Помещении"
+          text="2.2 Денежный оборот, полученный на расчетные счета Арендатора без использования ККТ, установленных в Помещении"
         />
         <div class="table-container">
           <StepsTablesCashKkt
@@ -315,7 +300,7 @@
 
       <section :class="$style.wrapper">
         <StepsCoreContentTitle
-          text="2.3 Денечный оборот, полученный в качестве неденежных форм расчетов"
+          text="2.3 Денежный оборот, полученный в качестве неденежных форм расчетов"
         />
         <div class="table-container">
           <StepsTablesNonCash
@@ -331,7 +316,7 @@
 
       <section :class="$style.wrapper">
         <StepsCoreContentTitle
-          text="2.4 Иные суммы, подлежащие включению в Денечный оборот в Помещении"
+          text="2.4 Иные суммы, подлежащие включению в Денежный оборот в Помещении"
         />
         <div class="table-container">
           <StepsTablesOtherSum

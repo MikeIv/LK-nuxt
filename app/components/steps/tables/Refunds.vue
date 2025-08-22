@@ -9,7 +9,6 @@
   interface RefundsTableProps {
     headers?: unknown[];
     initialData?: RefundsTableRow[];
-    initialAddedRowsIndices?: number[];
     loading?: boolean;
     error?: string | boolean;
   }
@@ -17,7 +16,6 @@
   const props = withDefaults(defineProps<RefundsTableProps>(), {
     headers: () => [],
     initialData: () => [],
-    initialAddedRowsIndices: () => [],
     loading: false,
     error: false,
   });
@@ -27,8 +25,6 @@
       e: "update:totalSumm" | "update:totalVAT" | "update:tableData",
       value: number | RefundsTableRow[],
     ): void;
-    (e: "rows-added", indices: number[]): void;
-    (e: "rows-removed", index: number): void;
     (
       e: "files-uploaded",
       payload: {
@@ -49,19 +45,10 @@
     editableRows: [...props.initialData] as RefundsTableRow[],
     kktErrors: {} as Record<number, string>,
     numberErrors: {} as Record<number, string>,
-    addedRowsCount: 0,
-    addedRowsIndices: [] as number[],
     tableMessage: "",
   });
 
-  const {
-    editableRows,
-    kktErrors,
-    numberErrors,
-    addedRowsCount,
-    addedRowsIndices,
-    tableMessage,
-  } = toRefs(state);
+  const { editableRows, kktErrors, numberErrors, tableMessage } = toRefs(state);
 
   const { loading: fileLoading } = useSaveFile();
 
@@ -74,43 +61,14 @@
       id: "",
       name: "",
       registration_number: "",
-      returns_goods_services_with_nds: "",
-      returns_goods_services_nds: "",
-      gift_certificates_sold_with_nds: "",
-      gift_certificates_sold_nds: "",
+      returns_goods_services_with_nds: "0,00",
+      returns_goods_services_nds: "0,00",
+      gift_certificates_sold_with_nds: "0,00",
+      gift_certificates_sold_nds: "0,00",
       file_ids: [],
       files: [],
     };
   }
-
-  const showRemoveButton = ref(false);
-
-  const addRow = (): void => {
-    showRemoveButton.value = true;
-    const newRow = createEmptyRow();
-    newRow.name = `Основание ${editableRows.value.length + 1}`;
-    editableRows.value.push(newRow);
-    addedRowsIndices.value.push(editableRows.value.length - 1);
-    addedRowsCount.value++;
-    tableMessage.value = "Добавлено основание";
-    emit("rows-added", [...addedRowsIndices.value]);
-  };
-
-  const removeLastRow = (): void => {
-    if (editableRows.value.length > 1 && addedRowsIndices.value.length > 0) {
-      const lastAddedIndex = addedRowsIndices.value.pop();
-      if (lastAddedIndex !== undefined) {
-        showRemoveButton.value = false;
-        editableRows.value.splice(lastAddedIndex, 1);
-        addedRowsIndices.value = addedRowsIndices.value.map((i) =>
-          i > lastAddedIndex ? i - 1 : i,
-        );
-        emit("rows-removed", lastAddedIndex);
-      }
-      addedRowsCount.value--;
-      tableMessage.value = "Основание удалено";
-    }
-  };
 
   const { totalWithVAT, totalVAT } = useRefundsCalculations(editableRows);
 
@@ -124,15 +82,15 @@
               ...row,
               name: row.name || `Основание ${index + 1}`,
               returns_goods_services_with_nds:
-                row.returns_goods_services_with_nds || "",
-              returns_goods_services_nds: row.returns_goods_services_nds || "",
+                row.returns_goods_services_with_nds || "0,00",
+              returns_goods_services_nds:
+                row.returns_goods_services_nds || "0,00",
               gift_certificates_sold_with_nds:
-                row.gift_certificates_sold_with_nds || "",
-              gift_certificates_sold_nds: row.gift_certificates_sold_nds || "",
+                row.gift_certificates_sold_with_nds || "0,00",
+              gift_certificates_sold_nds:
+                row.gift_certificates_sold_nds || "0,00",
             }))
           : [createEmptyRow()];
-
-        addedRowsIndices.value = props.initialAddedRowsIndices || [];
       }
     },
     { immediate: true },
@@ -145,10 +103,10 @@
   } = useKktInput(editableRows, kktErrors, emit);
 
   const fieldValidations = {
-    returns_goods_services_with_nds: { required: true, min: 0 },
-    returns_goods_services_nds: { required: true, min: 0 },
-    gift_certificates_sold_with_nds: { required: true, min: 0 },
-    gift_certificates_sold_nds: { required: true, min: 0 },
+    returns_goods_services_with_nds: { required: false, min: 0 },
+    returns_goods_services_nds: { required: false, min: 0 },
+    gift_certificates_sold_with_nds: { required: false, min: 0 },
+    gift_certificates_sold_nds: { required: false, min: 0 },
   } as const;
 
   const { handleNumberInput, handleNumberBlur, shouldShowError } =
@@ -165,6 +123,25 @@
         file_ids: fileData.map((file) => Number(file.id)),
       }),
     });
+
+  // Функция для проверки, есть ли ненулевые значения в строке
+  const hasNonZeroValues = (row: RefundsTableRow): boolean => {
+    const numericFields = [
+      "returns_goods_services_with_nds",
+      "returns_goods_services_nds",
+      "gift_certificates_sold_with_nds",
+      "gift_certificates_sold_nds",
+    ];
+
+    return numericFields.some((field) => {
+      const value = row[field as keyof RefundsTableRow];
+      if (typeof value === "string") {
+        const numericValue = parseFloat(value.replace(",", "."));
+        return !isNaN(numericValue) && numericValue > 0;
+      }
+      return false;
+    });
+  };
 
   const getTableData = () => ({
     rows: [...editableRows.value],
@@ -193,12 +170,7 @@
     :loading="loading"
     :error="error"
     :message="tableMessage"
-    add-button-text="Добавить основание"
-    remove-button-text="Отменить добавление"
-    :show-remove-button="showRemoveButton"
     is-table
-    @add="addRow"
-    @remove="removeLastRow"
   >
     <template #row="{ item: row, index }">
       <div class="cell body-cell" :class="$style.centre">
@@ -217,7 +189,6 @@
           placeholder="Ровно 16 цифр"
           maxlength="16"
           inputmode="numeric"
-          required
           :class="[
             $style.inputField,
             { [$style.errorInput]: shouldShowErrorKkt(index) },
@@ -236,7 +207,6 @@
             type="text"
             :value="row.returns_goods_services_with_nds"
             placeholder="0,00"
-            required
             :class="[
               $style.inputField,
               {
@@ -244,8 +214,6 @@
                   index,
                   'returns_goods_services_with_nds',
                 ),
-                [$style.requiredField]:
-                  fieldValidations['returns_goods_services_with_nds']?.required,
               },
             ]"
             @input="
@@ -266,7 +234,6 @@
             type="text"
             :value="row.returns_goods_services_nds"
             placeholder="0,00"
-            required
             :class="[
               $style.inputField,
               {
@@ -274,8 +241,6 @@
                   index,
                   'returns_goods_services_nds',
                 ),
-                [$style.requiredField]:
-                  fieldValidations['returns_goods_services_nds']?.required,
               },
             ]"
             @input="
@@ -292,7 +257,6 @@
             type="text"
             :value="row.gift_certificates_sold_with_nds"
             placeholder="0,00"
-            required
             :class="[
               $style.inputField,
               {
@@ -300,8 +264,6 @@
                   index,
                   'gift_certificates_sold_with_nds',
                 ),
-                [$style.requiredField]:
-                  fieldValidations['gift_certificates_sold_with_nds']?.required,
               },
             ]"
             @input="
@@ -319,7 +281,6 @@
             type="text"
             :value="row.gift_certificates_sold_nds"
             placeholder="0,00"
-            required
             :class="[
               $style.inputField,
               {
@@ -327,8 +288,6 @@
                   index,
                   'gift_certificates_sold_nds',
                 ),
-                [$style.requiredField]:
-                  fieldValidations['gift_certificates_sold_nds']?.required,
               },
             ]"
             @input="
@@ -348,7 +307,7 @@
           :max-files="10"
           :files="row.files || []"
           :file-ids="row.file_ids || []"
-          :is-required="true"
+          :is-required="hasNonZeroValues(row)"
           @files-uploaded="
             ({ filesData }) => handleFileUploaded({ index, filesData })
           "
@@ -397,10 +356,6 @@
       outline: none;
       border-color: var(--a-borderAccent);
     }
-  }
-
-  .requiredField:not(:focus):placeholder-shown {
-    border-color: var(--a-borderError);
   }
 
   .errorInput {

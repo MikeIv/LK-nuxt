@@ -1,41 +1,42 @@
+// app/composables/tables/useSaveReport.ts
 import type { TableData } from "~/composables/tables/useFormValidationStepTwo";
 
 interface StepOneStore {
   visitorsCount: number;
   checksCount: number;
   dateRange: [Date | string | null, Date | string | null] | null;
-  // добавьте другие свойства если есть
 }
 
 interface StepTwoStore {
+  kkt: { rows: unknown[]; withVAT: number; VAT: number };
+  cashKkt: { rows: unknown[]; withVAT: number; VAT: number };
+  nonCash: { rows: unknown[]; withVAT: number; VAT: number };
+  otherSum: { rows: unknown[]; withVAT: number; VAT: number };
+}
+
+interface StoreWithUpdate {
   updateTable: (
     tableName: string,
     data: { rows: unknown[]; withVAT: number; VAT: number },
   ) => void;
-  kkt: { rows: unknown[] };
-  cashKkt: { rows: unknown[] };
-  nonCash: { rows: unknown[] };
-  otherSum: { rows: unknown[] };
 }
 
 interface SaveReportParams {
-  kktTableRef: Ref<unknown>;
-  cashKktTableRef: Ref<unknown>;
-  nonCashTableRef: Ref<unknown>;
-  otherSumTableRef: Ref<unknown>;
+  tableRefs: Record<string, Ref<unknown>>;
   stepOneStore: StepOneStore;
   stepTwoStore: StepTwoStore;
+  store: StoreWithUpdate;
   loadReport: (url: string, options?: unknown) => Promise<unknown>;
+  stepType: "stepTwo" | "stepThree";
 }
 
 export const useSaveReport = ({
-  kktTableRef,
-  cashKktTableRef,
-  nonCashTableRef,
-  otherSumTableRef,
+  tableRefs,
   stepOneStore,
   stepTwoStore,
+  store,
   loadReport,
+  stepType,
 }: SaveReportParams) => {
   const isSaving = ref(false);
 
@@ -64,14 +65,13 @@ export const useSaveReport = ({
   const saveReport = async (status: "Draft" | "Final") => {
     isSaving.value = true;
     try {
-      const tablesData = {
-        kkt: getTableData(kktTableRef),
-        cashKkt: getTableData(cashKktTableRef),
-        nonCash: getTableData(nonCashTableRef),
-        otherSum: getTableData(otherSumTableRef),
-      };
+      const tablesData: Record<string, TableData> = {};
 
-      // Безопасное получение дат
+      // Получаем данные из всех переданных таблиц
+      for (const [tableName, tableRef] of Object.entries(tableRefs)) {
+        tablesData[tableName] = getTableData(tableRef);
+      }
+
       const startDate = stepOneStore.dateRange?.[0]
         ? getSafeDate(stepOneStore.dateRange[0])
         : new Date().toISOString();
@@ -80,55 +80,93 @@ export const useSaveReport = ({
         ? getSafeDate(stepOneStore.dateRange[1])
         : new Date().toISOString();
 
-      const reportData = {
+      // Базовая структура отчета
+      const reportData: unknown = {
         status,
         report: {
           visitors_count: stepOneStore.visitorsCount || 0,
           receipts_count: stepOneStore.checksCount || 0,
-          comparison_base: 0,
-          rent_percentage: 0,
-          kkts: tablesData.kkt.rows.map((row) => ({
-            name: row.name || "",
-            registration_number: row.registration_number || "",
-            start_meter_reading: parseFloat(row.start_meter_reading) || 0,
-            end_meter_reading: parseFloat(row.end_meter_reading) || 0,
-            amount_without_advance_with_nds:
-              parseFloat(row.amount_without_advance_with_nds) || 0,
-            amount_without_advance_nds:
-              parseFloat(row.amount_without_advance_nds) || 0,
-            advance_without_certificates_with_nds:
-              parseFloat(row.advance_without_certificates_with_nds) || 0,
-            advance_without_certificates_nds:
-              parseFloat(row.advance_without_certificates_nds) || 0,
-            file_ids: row.file_ids || [],
-          })),
-          cash_turnovers_without_kkt: tablesData.cashKkt.rows.map((row) => ({
-            name: row.name || "",
-            settlement_account_number: row.settlement_account_number || "",
-            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
-            amount_nds: parseFloat(row.amount_nds) || 0,
-            file_ids: row.file_ids || [],
-          })),
-          cash_turnovers_non_cash: tablesData.nonCash.rows.map((row) => ({
-            name: row.name || "",
-            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
-            amount_nds: parseFloat(row.amount_nds) || 0,
-            file_ids: row.file_ids || [],
-          })),
-          cash_turnovers_other: tablesData.otherSum.rows.map((row) => ({
-            name: row.name || "",
-            amount_with_nds: parseFloat(row.amount_with_nds) || 0,
-            amount_nds: parseFloat(row.amount_nds) || 0,
-            file_ids: row.file_ids || [],
-          })),
-          kkts_exclusions: [],
-          cash_turnover_exclusions_other: [],
           period: {
             start: startDate,
             end: endDate,
           },
         },
       };
+
+      // Добавляем данные из второго шага (если есть)
+      if (stepTwoStore) {
+        reportData.report = {
+          ...reportData.report,
+          comparison_base: 0,
+          rent_percentage: 0,
+          kkts:
+            stepTwoStore.kkt?.rows.map((row: unknown) => ({
+              name: row.name || "",
+              registration_number: row.registration_number || "",
+              start_meter_reading: parseFloat(row.start_meter_reading) || 0,
+              end_meter_reading: parseFloat(row.end_meter_reading) || 0,
+              amount_without_advance_with_nds:
+                parseFloat(row.amount_without_advance_with_nds) || 0,
+              amount_without_advance_nds:
+                parseFloat(row.amount_without_advance_nds) || 0,
+              advance_without_certificates_with_nds:
+                parseFloat(row.advance_without_certificates_with_nds) || 0,
+              advance_without_certificates_nds:
+                parseFloat(row.advance_without_certificates_nds) || 0,
+              file_ids: row.file_ids || [],
+            })) || [],
+          cash_turnovers_without_kkt:
+            stepTwoStore.cashKkt?.rows.map((row: unknown) => ({
+              name: row.name || "",
+              settlement_account_number: row.settlement_account_number || "",
+              amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+              amount_nds: parseFloat(row.amount_nds) || 0,
+              file_ids: row.file_ids || [],
+            })) || [],
+          cash_turnovers_non_cash:
+            stepTwoStore.nonCash?.rows.map((row: unknown) => ({
+              name: row.name || "",
+              amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+              amount_nds: parseFloat(row.amount_nds) || 0,
+              file_ids: row.file_ids || [],
+            })) || [],
+          cash_turnovers_other:
+            stepTwoStore.otherSum?.rows.map((row: unknown) => ({
+              name: row.name || "",
+              amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+              amount_nds: parseFloat(row.amount_nds) || 0,
+              file_ids: row.file_ids || [],
+            })) || [],
+        };
+      }
+
+      // Добавляем данные третьего шага
+      if (stepType === "stepThree") {
+        reportData.report = {
+          ...reportData.report,
+          kkts_exclusions:
+            tablesData.refunds?.rows.map((row: unknown) => ({
+              name: row.name || "",
+              registration_number: row.registration_number || "",
+              returns_goods_services_with_nds:
+                parseFloat(row.returns_goods_services_with_nds) || 0,
+              returns_goods_services_nds:
+                parseFloat(row.returns_goods_services_nds) || 0,
+              gift_certificates_sold_with_nds:
+                parseFloat(row.gift_certificates_sold_with_nds) || 0,
+              gift_certificates_sold_nds:
+                parseFloat(row.gift_certificates_sold_nds) || 0,
+              file_id: row.file_id || null,
+            })) || [],
+          cash_turnover_exclusions_other:
+            tablesData.otherAmounts?.rows.map((row: unknown) => ({
+              name: row.name || "",
+              amount_with_nds: parseFloat(row.amount_with_nds) || 0,
+              amount_nds: parseFloat(row.amount_nds) || 0,
+              file_id: row.file_id || null,
+            })) || [],
+        };
+      }
 
       const response = await loadReport("/tenants/reports", {
         method: "POST",
@@ -155,27 +193,14 @@ export const useSaveReport = ({
   };
 
   const updateStores = (tablesData: Record<string, TableData>) => {
-    if (stepTwoStore.updateTable) {
-      stepTwoStore.updateTable("kkt", {
-        rows: tablesData.kkt.rows || [],
-        withVAT: tablesData.kkt.totals?.withVAT || 0,
-        VAT: tablesData.kkt.totals?.VAT || 0,
-      });
-      stepTwoStore.updateTable("cashKkt", {
-        rows: tablesData.cashKkt.rows || [],
-        withVAT: tablesData.cashKkt.totals?.withVAT || 0,
-        VAT: tablesData.cashKkt.totals?.VAT || 0,
-      });
-      stepTwoStore.updateTable("nonCash", {
-        rows: tablesData.nonCash.rows || [],
-        withVAT: tablesData.nonCash.totals?.withVAT || 0,
-        VAT: tablesData.nonCash.totals?.VAT || 0,
-      });
-      stepTwoStore.updateTable("otherSum", {
-        rows: tablesData.otherSum.rows || [],
-        withVAT: tablesData.otherSum.totals?.withVAT || 0,
-        VAT: tablesData.otherSum.totals?.VAT || 0,
-      });
+    if (store.updateTable) {
+      for (const [tableName, tableData] of Object.entries(tablesData)) {
+        store.updateTable(tableName, {
+          rows: tableData.rows || [],
+          withVAT: tableData.totals?.withVAT || 0,
+          VAT: tableData.totals?.VAT || 0,
+        });
+      }
     }
   };
 

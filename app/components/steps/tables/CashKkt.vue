@@ -171,19 +171,15 @@
     const settlementAccount = row.settlement_account_number;
     const name = row.name;
 
-    // Исправленные проверки - учитываем "0" как валидное значение
-    const hasAmountWithNds =
-      amountWithNds !== undefined &&
-      amountWithNds !== "" &&
-      amountWithNds !== "0";
-    const hasAmountNds =
-      amountNds !== undefined && amountNds !== "" && amountNds !== "0";
+    const hasNonZeroAmount =
+      (amountWithNds && amountWithNds !== "0" && amountWithNds !== "0,00") ||
+      (amountNds && amountNds !== "0" && amountNds !== "0,00");
+
     const hasSettlementAccount =
       settlementAccount && settlementAccount.trim() !== "";
-    const hasName = name && name.trim() !== "";
-    const hasFileIds = row.file_ids && row.file_ids.length > 0;
 
-    // Валидация числовых полей (только если они не пустые и не "0")
+    const shouldValidateAllFields = hasNonZeroAmount || hasSettlementAccount;
+
     if (
       amountWithNds &&
       amountWithNds !== "0" &&
@@ -201,33 +197,63 @@
     }
 
     const isNewlyAddedRow = addedRowsIndices.value.includes(index);
+
     if (isNewlyAddedRow) {
-      if (!hasName) errors.push("name");
-      if (!hasSettlementAccount) errors.push("settlement_account_number");
-      if (!hasAmountWithNds) errors.push("amount_with_nds");
-      if (!hasAmountNds) errors.push("amount_nds");
-      if (!hasFileIds) errors.push("files");
+      if (!name || name.trim() === "") errors.push("name");
+      if (!settlementAccount || settlementAccount.trim() === "")
+        errors.push("settlement_account_number");
+      if (!amountWithNds || amountWithNds === "0" || amountWithNds === "0,00")
+        errors.push("amount_with_nds");
+      if (!amountNds || amountNds === "0" || amountNds === "0,00")
+        errors.push("amount_nds");
+      if (!row.file_ids || row.file_ids.length === 0) errors.push("files");
+    } else if (shouldValidateAllFields) {
+      if (!name || name.trim() === "") errors.push("name");
+      if (!settlementAccount || settlementAccount.trim() === "")
+        errors.push("settlement_account_number");
+      if (!amountWithNds || amountWithNds === "0" || amountWithNds === "0,00")
+        errors.push("amount_with_nds");
+      if (!amountNds || amountNds === "0" || amountNds === "0,00")
+        errors.push("amount_nds");
+      if (!row.file_ids || row.file_ids.length === 0) errors.push("files");
     } else {
-      // 3. ДЛЯ ОСТАЛЬНЫХ СТРОК: проверяем измененные поля
       let hasNonEmptyModifiedField = false;
       if (modifiedFields.value[index]) {
         for (const field of modifiedFields.value[index]) {
-          if (field === "name" && hasName) hasNonEmptyModifiedField = true;
-          if (field === "settlement_account_number" && hasSettlementAccount)
+          if (field === "name" && name && name.trim() !== "")
             hasNonEmptyModifiedField = true;
-          if (field === "amount_with_nds" && hasAmountWithNds)
+          if (
+            field === "settlement_account_number" &&
+            settlementAccount &&
+            settlementAccount.trim() !== ""
+          )
             hasNonEmptyModifiedField = true;
-          if (field === "amount_nds" && hasAmountNds)
+          if (
+            field === "amount_with_nds" &&
+            amountWithNds &&
+            amountWithNds !== "0" &&
+            amountWithNds !== "0,00"
+          )
+            hasNonEmptyModifiedField = true;
+          if (
+            field === "amount_nds" &&
+            amountNds &&
+            amountNds !== "0" &&
+            amountNds !== "0,00"
+          )
             hasNonEmptyModifiedField = true;
         }
       }
 
       if (hasNonEmptyModifiedField) {
-        if (!hasName) errors.push("name");
-        if (!hasSettlementAccount) errors.push("settlement_account_number");
-        if (!hasAmountWithNds) errors.push("amount_with_nds");
-        if (!hasAmountNds) errors.push("amount_nds");
-        if (!hasFileIds) errors.push("files");
+        if (!name || name.trim() === "") errors.push("name");
+        if (!settlementAccount || settlementAccount.trim() === "")
+          errors.push("settlement_account_number");
+        if (!amountWithNds || amountWithNds === "0" || amountWithNds === "0,00")
+          errors.push("amount_with_nds");
+        if (!amountNds || amountNds === "0" || amountNds === "0,00")
+          errors.push("amount_nds");
+        if (!row.file_ids || row.file_ids.length === 0) errors.push("files");
       }
 
       if (modifiedFields.value[index] && !hasNonEmptyModifiedField) {
@@ -245,34 +271,47 @@
   };
 
   const hasAmountInRow = (row: CashTableRow, index: number): boolean => {
-    // Для новых строк файлы всегда обязательны
+    const amountWithNds = row.amount_with_nds;
+    const amountNds = row.amount_nds;
+    const settlementAccount = row.settlement_account_number;
+
+    const hasNonZeroAmount =
+      (amountWithNds && amountWithNds !== "0" && amountWithNds !== "0,00") ||
+      (amountNds && amountNds !== "0" && amountNds !== "0,00");
+
+    const hasSettlementAccount =
+      settlementAccount && settlementAccount.trim() !== "";
+
     const isNewlyAddedRow = addedRowsIndices.value.includes(index);
     if (isNewlyAddedRow) return true;
 
-    // Для остальных строк файлы обязательны только если есть непустые измененные поля
+    if (hasNonZeroAmount || hasSettlementAccount) return true;
+
     let hasNonEmptyModifiedField = false;
     if (modifiedFields.value[index]) {
-      const hasAmountWithNds =
-        row.amount_with_nds &&
-        row.amount_with_nds !== "" &&
-        row.amount_with_nds !== "0";
-      const hasAmountNds =
-        row.amount_nds && row.amount_nds !== "" && row.amount_nds !== "0";
-      const hasSettlementAccount =
-        row.settlement_account_number &&
-        row.settlement_account_number.trim() !== "";
       const hasName = row.name && row.name.trim() !== "";
 
       for (const field of modifiedFields.value[index]) {
         if (field === "name" && hasName) hasNonEmptyModifiedField = true;
         if (field === "settlement_account_number" && hasSettlementAccount)
           hasNonEmptyModifiedField = true;
-        if (field === "amount_with_nds" && hasAmountWithNds)
+        if (
+          field === "amount_with_nds" &&
+          amountWithNds &&
+          amountWithNds !== "0" &&
+          amountWithNds !== "0,00"
+        )
           hasNonEmptyModifiedField = true;
-        if (field === "amount_nds" && hasAmountNds)
+        if (
+          field === "amount_nds" &&
+          amountNds &&
+          amountNds !== "0" &&
+          amountNds !== "0,00"
+        )
           hasNonEmptyModifiedField = true;
       }
     }
+
     return hasNonEmptyModifiedField;
   };
 
@@ -294,8 +333,8 @@
     id: "",
     name: "",
     settlement_account_number: "",
-    amount_with_nds: "0",
-    amount_nds: "0",
+    amount_with_nds: "0,00",
+    amount_nds: "0,00",
     file_ids: [],
     files: [],
     isNew: true,
@@ -304,9 +343,32 @@
   const normalizeRowData = (row: CashTableRow): CashTableRow => {
     const isApiData = !!(row.name && row.name.trim() !== "");
     return {
+      ...createEmptyRow(),
       ...row,
+      amount_with_nds:
+        typeof row.amount_with_nds === "number"
+          ? row.amount_with_nds.toFixed(2).replace(".", ",")
+          : row.amount_with_nds || "0,00",
+      amount_nds:
+        typeof row.amount_nds === "number"
+          ? row.amount_nds.toFixed(2).replace(".", ",")
+          : row.amount_nds || "0,00",
       isNew: !isApiData,
     };
+  };
+
+  const formattedRows = computed(() => {
+    return editableRows.value.map((row) => ({
+      ...row,
+      amount_with_nds: formatForDisplay(row.amount_with_nds),
+      amount_nds: formatForDisplay(row.amount_nds),
+    }));
+  });
+
+  const formatForDisplay = (value: string): string => {
+    if (value === "0" || value === "0.00") return "0,00";
+    if (value && !value.includes(",")) return value + ",00";
+    return value;
   };
 
   const emitUpdate = () => {
@@ -370,18 +432,27 @@
 
   watch(
     () => props.initialData,
-    (newData) => {
+    async (newData) => {
       if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
-        editableRows.value = newData?.length
+        const normalizedData = newData?.length
           ? newData.map(normalizeRowData)
           : [createEmptyRow()];
+
+        editableRows.value = [];
+        await nextTick();
+        editableRows.value = normalizedData;
+
         addedRowsIndices.value = [];
         invalidFields.value = {};
 
-        editableRows.value.forEach((_, index) => validateRow(index));
+        await nextTick();
+
+        editableRows.value.forEach((row, index) => {
+          validateRow(index);
+        });
       }
     },
-    { immediate: true },
+    { immediate: true, deep: true },
   );
 
   const getTableData = () => ({
@@ -466,8 +537,9 @@
       <div class="cell" :class="$style.cellRow">
         <div>
           <input
+            :key="`amount_with_nds_${index}_${row.amount_with_nds}`"
             type="text"
-            :value="row.amount_with_nds"
+            :value="formattedRows[index].amount_with_nds"
             placeholder="0,00"
             pattern="[0-9]*[.,]?[0-9]*"
             :class="[
@@ -485,8 +557,9 @@
         </div>
         <div>
           <input
+            :key="`amount_nds_${index}_${row.amount_nds}`"
             type="text"
-            :value="row.amount_nds"
+            :value="formattedRows[index].amount_nds"
             placeholder="0,00"
             pattern="[0-9]*[.,]?[0-9]*"
             :class="[

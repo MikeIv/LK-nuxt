@@ -77,7 +77,6 @@ export const useKktInput = (
   const validateKktNumber = (index: number): boolean => {
     const kktNumber = editableRows.value[index].registration_number || "";
 
-    // Валидация на обязательность поля
     if (!validateRequired(kktNumber)) {
       kktErrors.value[index] = "";
       return false;

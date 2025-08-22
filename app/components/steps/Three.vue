@@ -1,4 +1,6 @@
 <script setup lang="ts">
+  import { useStepOneStore } from "~/stores/stepOne";
+  import { useStepTwoStore } from "~/stores/stepTwo";
   import { useStepThreeStore } from "~/stores/stepThree";
 
   const handleBack = () => {
@@ -23,87 +25,146 @@
   const refundsTableRef = ref();
   const otherAmountsTableRef = ref();
 
-  const isSaving = ref(false);
   const stepOneStore = useStepOneStore();
+  const stepTwoStore = useStepTwoStore();
   const stepThreeStore = useStepThreeStore();
 
-  const saveData = async () => {
-    isSaving.value = true;
-    try {
-      const tablesData = {
-        refunds: refundsTableRef.value?.getTableData() || {
-          rows: [],
-          totals: { withVAT: 0, VAT: 0 },
-        },
-        otherAmounts: otherAmountsTableRef.value?.getTableData() || {
-          rows: [],
-          totals: { withVAT: 0, VAT: 0 },
-        },
-      };
+  const isDataChanged = ref(false);
 
-      console.log("Подготовка данных для отправки:", tablesData); // Логируем данные
+  const checkDataChanges = () => {
+    isDataChanged.value = true;
+  };
 
-      const reportData = {
-        status: "Draft",
-        report: {
-          visitors_count: stepOneStore.visitorsCount,
-          receipts_count: stepOneStore.checksCount,
-          kkts_exclusions: tablesData.refunds.rows.map((row) => ({
-            name: row.name,
-            registration_number: row.registration_number,
-            returns_goods_services_with_nds:
-              Number(row.returns_goods_services_with_nds) || 0,
-            returns_goods_services_nds:
-              Number(row.returns_goods_services_nds) || 0,
-            gift_certificates_sold_with_nds:
-              Number(row.gift_certificates_sold_with_nds) || 0,
-            gift_certificates_sold_nds:
-              Number(row.gift_certificates_sold_nds) || 0,
-            file_id: row.file_id || null,
-          })),
-          cash_turnover_exclusions_other: tablesData.otherAmounts.rows.map(
-            (row) => ({
-              name: row.name,
-              amount_with_nds: Number(row.amount_with_nds) || 0,
-              amount_nds: Number(row.amount_nds) || 0,
-              file_id: row.file_id || null,
-            }),
-          ),
-          period: {
-            start: new Date(stepOneStore.dateRange[0]).toISOString(),
-            end: new Date(stepOneStore.dateRange[1]).toISOString(),
-          },
-        },
-      };
+  const handleTableChange = () => {
+    checkDataChanges();
+  };
 
-      console.log("Отправка данных на сервер:", reportData); // Логируем полные данные
+  // Функция для проверки наличия ненулевых значений в строке возвратов
+  const hasNonZeroValuesInRefundsRow = (row: unknown): boolean => {
+    const numericFields = [
+      "returns_goods_services_with_nds",
+      "returns_goods_services_nds",
+      "gift_certificates_sold_with_nds",
+      "gift_certificates_sold_nds",
+    ];
 
-      const response = await loadReport("/tenants/reports", {
-        method: "POST",
-        body: reportData,
-      });
+    return numericFields.some((field) => {
+      const value = row[field];
+      if (typeof value === "string") {
+        const numericValue = parseFloat(value.replace(",", "."));
+        return !isNaN(numericValue) && numericValue > 0;
+      }
+      return false;
+    });
+  };
 
-      if (!response) {
-        throw new Error("Пустой ответ от сервера");
+  // Валидация обязательных полей таблиц
+  const validateForm = () => {
+    const refundsData = refundsTableRef.value?.getTableData?.() || { rows: [] };
+    const otherAmountsData = otherAmountsTableRef.value?.getTableData?.() || {
+      rows: [],
+    };
+
+    // Проверяем обязательные поля для таблицы возвратов
+    for (const [index, row] of refundsData.rows.entries()) {
+      if (!row.name || !row.registration_number) {
+        return {
+          isValid: false,
+          error: "Заполните все обязательные поля в таблице Возвратов",
+        };
       }
 
-      console.log("Черновик успешно сохранён", response);
-      // Добавляем уведомление об успешном сохранении
-      useToast().add({
-        title: "Черновик сохранен",
-        description: "Данные успешно сохранены как черновик",
-        color: "green",
-      });
-    } catch (error) {
-      console.error("Ошибка при сохранении черновика:", error);
-      // Добавляем уведомление об ошибке
-      useToast().add({
-        title: "Ошибка сохранения",
-        description: error.message || "Не удалось сохранить черновик",
-        color: "red",
-      });
-    } finally {
-      isSaving.value = false;
+      // Проверяем, что если есть ненулевые значения, то должны быть файлы
+      if (
+        hasNonZeroValuesInRefundsRow(row) &&
+        (!row.files || row.files.length === 0)
+      ) {
+        return {
+          isValid: false,
+          error: `Для строки ${index + 1} в таблице Возвратов необходимо прикрепить файлы, так как есть ненулевые значения`,
+        };
+      }
+
+      // Валидация номера ККТ (ровно 16 цифр)
+      if (
+        row.registration_number &&
+        !/^\d{16}$/.test(row.registration_number)
+      ) {
+        return {
+          isValid: false,
+          error: `Номер ККТ в строке ${index + 1} должен содержать ровно 16 цифр`,
+        };
+      }
+    }
+
+    // Проверяем обязательные поля для таблицы иных сумм
+    for (const [index, row] of otherAmountsData.rows.entries()) {
+      if (!row.name) {
+        return {
+          isValid: false,
+          error: "Заполните все обязательные поля в таблице Иных сумм",
+        };
+      }
+
+      // Проверяем, что если есть ненулевые значения, то должно быть описание
+      const hasAmount =
+        row.amount && parseFloat(row.amount.replace(",", ".")) > 0;
+      if (hasAmount && !row.description) {
+        return {
+          isValid: false,
+          error: `Для строки ${index + 1} в таблице Иных сумм необходимо заполнить описание, так как указана сумма`,
+        };
+      }
+    }
+
+    return { isValid: true, error: "" };
+  };
+
+  const validationResult = computed(() => validateForm());
+  const isFormValid = computed(() => validationResult.value.isValid);
+  const validationError = ref("");
+
+  watch(
+    validationResult,
+    (result) => {
+      validationError.value = result.error;
+    },
+    { immediate: true },
+  );
+
+  const { isSaving, saveReport, updateStores } = useSaveReport({
+    tableRefs: {
+      refunds: refundsTableRef,
+      otherAmounts: otherAmountsTableRef,
+    },
+    stepOneStore,
+    stepTwoStore,
+    store: stepThreeStore,
+    loadReport,
+    stepType: "stepThree",
+  });
+
+  const saveSuccess = ref(false);
+  const saveSuccessMessage = ref("");
+
+  const saveData = async () => {
+    const saved = await saveReport("Draft");
+    if (saved) {
+      const tablesData = {
+        refunds: refundsTableRef.value?.getTableData(),
+        otherAmounts: otherAmountsTableRef.value?.getTableData(),
+      };
+      updateStores(tablesData);
+
+      saveSuccess.value = true;
+      saveSuccessMessage.value = "Данные успешно сохранены как черновик";
+
+      isDataChanged.value = false;
+
+      setTimeout(() => {
+        saveSuccess.value = false;
+        saveSuccessMessage.value = "";
+      }, 3000);
     }
   };
 
@@ -119,39 +180,7 @@
       },
     };
 
-    const validateTablesData = (data: {
-      refunds: { rows: unknown[]; totals: { withVAT: number; VAT: number } };
-      otherAmounts: {
-        rows: unknown[];
-        totals: { withVAT: number; VAT: number };
-      };
-    }): boolean => {
-      // Проверка на обязательные поля
-      for (const row of data.refunds.rows) {
-        if (!row.name || !row.registration_number) {
-          console.warn("Не заполнены обязательные поля в таблице Возвратов");
-          return false;
-        }
-      }
-
-      for (const row of data.otherAmounts.rows) {
-        if (!row.name) {
-          console.warn("Не заполнены обязательные поля в таблице Иных сумм");
-          return false;
-        }
-      }
-
-      return true;
-    };
-
-    if (!validateTablesData(tablesData)) {
-      console.error("Ошибка: Данные таблиц невалидны");
-      // Можно добавить UI-уведомление (например, через toast)
-      return;
-    }
-
     try {
-      // Сохраняем данные в хранилище stepThreeStore
       stepThreeStore.updateTable("refunds", {
         rows: tablesData.refunds.rows,
         withVAT: tablesData.refunds.totals.withVAT,
@@ -166,23 +195,23 @@
 
       console.log("Данные успешно сохранены:", tablesData);
 
-      // Добавляем уведомление об успешном сохранении
-      useToast().add({
-        title: "Данные сохранены",
-        description: "Данные успешно сохранены перед переходом",
-        color: "green",
-      });
+      // useToast().add({
+      //   title: "Данные сохранены",
+      //   description: "Данные успешно сохранены перед переходом",
+      //   color: "green",
+      // });
 
       navigateTo("/record/4");
     } catch (error) {
       console.error("Ошибка сохранения:", error);
+    }
+  };
 
-      // Добавляем уведомление об ошибке
-      useToast().add({
-        title: "Ошибка сохранения",
-        description: error.message || "Не удалось сохранить данные",
-        color: "red",
-      });
+  const setTableData = (ref: unknown, storeData: unknown, apiData: unknown) => {
+    if (storeData?.rows?.length > 0) {
+      ref.value?.setData?.(storeData.rows);
+    } else if (apiData?.body?.length > 0) {
+      ref.value?.setData?.(apiData.body);
     }
   };
 
@@ -192,14 +221,49 @@
 
       await nextTick();
 
-      if (stepThreeStore.refunds.rows.length > 0) {
-        refundsTableRef.value?.setData?.(stepThreeStore.refunds.rows);
+      setTableData(refundsTableRef, stepThreeStore.refunds, tableRefunds.value);
+      setTableData(
+        otherAmountsTableRef,
+        stepThreeStore.otherAmounts,
+        tableOtherAmouts.value,
+      );
+
+      // Добавляем обработчики изменений для таблиц
+      if (refundsTableRef.value) {
+        refundsTableRef.value.$el?.addEventListener(
+          "change",
+          handleTableChange,
+        );
       }
-      if (stepThreeStore.otherAmounts.rows.length > 0) {
-        otherAmountsTableRef.value?.setData?.(stepThreeStore.otherAmounts.rows);
+      if (otherAmountsTableRef.value) {
+        otherAmountsTableRef.value.$el?.addEventListener(
+          "change",
+          handleTableChange,
+        );
       }
     } catch (error) {
       console.error("Ошибка при загрузке данных:", error);
+
+      useToast().add({
+        title: "Ошибка загрузки",
+        description: "Не удалось загрузить данные",
+        color: "red",
+      });
+    }
+  });
+
+  onBeforeUnmount(() => {
+    if (refundsTableRef.value) {
+      refundsTableRef.value.$el?.removeEventListener(
+        "change",
+        handleTableChange,
+      );
+    }
+    if (otherAmountsTableRef.value) {
+      otherAmountsTableRef.value.$el?.removeEventListener(
+        "change",
+        handleTableChange,
+      );
     }
   });
 </script>
@@ -222,6 +286,7 @@
             :initial-data="tableRefunds?.body"
             :loading="isLoading"
             :error="error"
+            @change="handleTableChange"
           />
         </div>
       </section>
@@ -237,6 +302,7 @@
             :initial-data="tableOtherAmouts?.body"
             :loading="isLoading"
             :error="error"
+            @change="handleTableChange"
           />
         </div>
       </section>
@@ -247,17 +313,44 @@
         <UButton class="steps-nav-btn ghost" @click="handleBack">Назад</UButton>
       </template>
       <template #action>
-        <UButton
-          class="steps-nav-btn ghost"
-          :loading="isSaving"
-          @click="saveData"
-          >Сохранить как черновик
-        </UButton>
+        <UTooltip :text="!isFormValid && !isDataChanged ? validationError : ''">
+          <UButton
+            class="steps-nav-btn ghost"
+            :loading="isSaving"
+            :disabled="!isDataChanged || !isFormValid"
+            @click="saveData"
+          >
+            Сохранить как черновик
+          </UButton>
+        </UTooltip>
+
+        <transition
+          enter-active-class="transition-opacity duration-300"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="transition-opacity duration-300"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <div
+            v-if="saveSuccess"
+            class="flex items-center text-green-600 text-sm font-medium ml-2"
+          >
+            <UIcon name="i-heroicons-check-circle" class="w-5 h-5 mr-1" />
+            {{ saveSuccessMessage }}
+          </div>
+        </transition>
       </template>
       <template #next>
-        <UButton class="steps-nav-btn solid" @click="validateAndNext"
-          >Далее
-        </UButton>
+        <UTooltip :text="!isFormValid ? validationError : ''">
+          <UButton
+            class="steps-nav-btn solid"
+            :disabled="!isFormValid"
+            @click="validateAndNext"
+          >
+            Далее
+          </UButton>
+        </UTooltip>
       </template>
     </StepsCoreNavigation>
   </div>

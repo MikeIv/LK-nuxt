@@ -19,10 +19,8 @@ export const useNumberFields = (
   fieldValidations: Partial<Record<NumberField, ValidationRules>> = {},
 ) => {
   const formatNumberInput = (value: string): string => {
-    // Удаляем все символы, кроме цифр, минуса и запятой
     let cleaned = value.replace(/[^\d,-]/g, "");
 
-    // Оставляем только первый минус
     const minusIndex = cleaned.indexOf("-");
     if (minusIndex > 0) {
       cleaned = cleaned.replace(/-/g, "");
@@ -31,12 +29,16 @@ export const useNumberFields = (
       cleaned = "-" + cleaned.replace(/-/g, "");
     }
 
-    // Оставляем только первую запятую
     const commaIndex = cleaned.indexOf(",");
     if (commaIndex !== -1) {
-      cleaned =
-        cleaned.slice(0, commaIndex + 1) +
-        cleaned.slice(commaIndex + 1).replace(/,/g, "");
+      const integerPart = cleaned.slice(0, commaIndex);
+      let decimalPart = cleaned.slice(commaIndex + 1).replace(/,/g, "");
+
+      if (decimalPart.length > 2) {
+        decimalPart = decimalPart.slice(0, 2);
+      }
+
+      cleaned = integerPart + "," + decimalPart;
     }
 
     return cleaned;
@@ -94,11 +96,10 @@ export const useNumberFields = (
     const rules = fieldValidations[field] || {};
     let error: string | null = null;
 
-    // Проверка на обязательность
     if (rules.required && !value) {
       error = "";
-    } else if (value === "0,00" && !rules.allowZero && rules.required) {
-      error = "Значение не может быть нулевым";
+    } else if (value === "" && !rules.allowZero && rules.required) {
+      error = "";
     } else if (rules.min !== undefined && value) {
       const numValue = parseFloat(value.replace(",", "."));
       if (numValue < rules.min) {
@@ -109,9 +110,7 @@ export const useNumberFields = (
       if (numValue > rules.max) {
         error = `Значение не может быть больше ${rules.max.toFixed(2).replace(".", ",")}`;
       }
-    }
-    // Кастомная валидация
-    else if (rules.customValidator && value) {
+    } else if (rules.customValidator && value) {
       error = rules.customValidator(value);
     }
 
@@ -120,7 +119,6 @@ export const useNumberFields = (
       return false;
     }
 
-    // Если ошибок нет, очищаем
     clearFieldError(index);
     return true;
   };
