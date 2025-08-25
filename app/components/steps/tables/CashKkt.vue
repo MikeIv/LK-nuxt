@@ -52,12 +52,14 @@
 
   const fieldValidations = {
     amount_with_nds: (value: string) => {
+      if (value === "0,00") return true;
       const num = parseFloat(value.replace(",", "."));
-      return !isNaN(num) && num >= 0;
+      return !isNaN(num) && num > 0;
     },
     amount_nds: (value: string) => {
+      if (value === "0,00") return true;
       const num = parseFloat(value.replace(",", "."));
-      return !isNaN(num) && num >= 0;
+      return !isNaN(num) && num > 0;
     },
   } as const;
 
@@ -65,28 +67,27 @@
     event: Event,
     field: "amount_with_nds" | "amount_nds",
     index: number,
-  ) => {
+  ): void => {
     const target = event.target as HTMLInputElement;
     let value = target.value;
 
-    value = value.replace(/\./g, ",");
-
     value = value.replace(/[^\d,]/g, "");
 
-    const decimalParts = value.split(",");
-    if (decimalParts.length > 1 && decimalParts[1].length > 2) {
-      decimalParts[1] = decimalParts[1].substring(0, 2);
-      value = decimalParts.join(",");
+    const commaParts = value.split(",");
+    if (commaParts.length > 2) {
+      value = commaParts[0] + "," + commaParts.slice(1).join("");
     }
 
-    const hasDecimal = /,/.test(value);
-    if (hasDecimal) {
-      value = value.replace(/,/g, (match, offset) => {
-        return offset === value.indexOf(match) ? match : "";
-      });
+    if (value.includes(",")) {
+      const [integer, decimal] = value.split(",");
+      if (decimal && decimal.length > 2) {
+        value = integer + "," + decimal.slice(0, 2);
+      }
     }
 
     editableRows.value[index][field] = value;
+    target.value = value;
+
     markFieldAsModified(index, field);
     validateRow(index);
     emitUpdate();
@@ -95,31 +96,29 @@
   const handleNumberBlur = (
     field: "amount_with_nds" | "amount_nds",
     index: number,
-  ) => {
-    const value = editableRows.value[index][field];
+  ): void => {
+    let value = editableRows.value[index][field];
 
-    if (value) {
-      let processedValue = value;
-
-      const parts = processedValue.split(",");
-      if (parts.length > 1 && parts[1].length > 2) {
-        parts[1] = parts[1].substring(0, 2);
-        processedValue = parts.join(",");
+    if (!value || value === ",") {
+      value = "0,00";
+    } else {
+      if (!value.includes(",")) {
+        value = value + ",00";
+      } else {
+        const [integer, decimal] = value.split(",");
+        const paddedDecimal = (decimal || "").padEnd(2, "0").slice(0, 2);
+        value = integer + "," + paddedDecimal;
       }
 
-      if (parts.length === 1 && parts[0] !== "") {
-        processedValue = parts[0] + ",00";
+      if (value.startsWith("0") && value.length > 1 && value[1] !== ",") {
+        value = value.replace(/^0+/, "");
+        if (value === "" || value.startsWith(",")) {
+          value = "0" + value;
+        }
       }
-
-      if (processedValue.startsWith(",")) {
-        processedValue = "0" + processedValue;
-      }
-
-      processedValue = processedValue.replace(/\./g, ",");
-
-      editableRows.value[index][field] = processedValue;
     }
 
+    editableRows.value[index][field] = value;
     markFieldAsModified(index, field);
     validateRow(index);
     emitUpdate();
@@ -158,7 +157,15 @@
     { immediate: true, deep: true },
   );
 
-  const shouldShowNumberError = (index: number, field: string): boolean => {
+  const shouldShowError = (
+    index: number,
+    field:
+      | "amount_with_nds"
+      | "amount_nds"
+      | "name"
+      | "settlement_account_number"
+      | "files",
+  ): boolean => {
     return invalidFields.value[index]?.includes(field) || false;
   };
 
@@ -170,19 +177,12 @@
     const amountNds = row.amount_nds;
     const settlementAccount = row.settlement_account_number;
     const name = row.name;
+    const hasFileIds = row.file_ids && row.file_ids.length > 0;
 
-    const hasNonZeroAmount =
-      (amountWithNds && amountWithNds !== "0" && amountWithNds !== "0,00") ||
-      (amountNds && amountNds !== "0" && amountNds !== "0,00");
-
-    const hasSettlementAccount =
-      settlementAccount && settlementAccount.trim() !== "";
-
-    const shouldValidateAllFields = hasNonZeroAmount || hasSettlementAccount;
-
+    // Валидация числовых полей
     if (
       amountWithNds &&
-      amountWithNds !== "0" &&
+      amountWithNds !== "0,00" &&
       !fieldValidations.amount_with_nds(amountWithNds)
     ) {
       errors.push("amount_with_nds");
@@ -190,7 +190,7 @@
 
     if (
       amountNds &&
-      amountNds !== "0" &&
+      amountNds !== "0,00" &&
       !fieldValidations.amount_nds(amountNds)
     ) {
       errors.push("amount_nds");
@@ -199,27 +199,21 @@
     const isNewlyAddedRow = addedRowsIndices.value.includes(index);
 
     if (isNewlyAddedRow) {
+      // Для новых строк все поля обязательны
       if (!name || name.trim() === "") errors.push("name");
       if (!settlementAccount || settlementAccount.trim() === "")
         errors.push("settlement_account_number");
-      if (!amountWithNds || amountWithNds === "0" || amountWithNds === "0,00")
+      if (!amountWithNds || amountWithNds === "0,00")
         errors.push("amount_with_nds");
-      if (!amountNds || amountNds === "0" || amountNds === "0,00")
-        errors.push("amount_nds");
-      if (!row.file_ids || row.file_ids.length === 0) errors.push("files");
-    } else if (shouldValidateAllFields) {
-      if (!name || name.trim() === "") errors.push("name");
-      if (!settlementAccount || settlementAccount.trim() === "")
-        errors.push("settlement_account_number");
-      if (!amountWithNds || amountWithNds === "0" || amountWithNds === "0,00")
-        errors.push("amount_with_nds");
-      if (!amountNds || amountNds === "0" || amountNds === "0,00")
-        errors.push("amount_nds");
-      if (!row.file_ids || row.file_ids.length === 0) errors.push("files");
+      if (!amountNds || amountNds === "0,00") errors.push("amount_nds");
+      if (!hasFileIds) errors.push("files");
     } else {
+      // Для существующих строк проверяем только измененные поля
       let hasNonEmptyModifiedField = false;
-      if (modifiedFields.value[index]) {
-        for (const field of modifiedFields.value[index]) {
+      const modifiedFieldsForRow = modifiedFields.value[index];
+
+      if (modifiedFieldsForRow) {
+        for (const field of modifiedFieldsForRow) {
           if (field === "name" && name && name.trim() !== "")
             hasNonEmptyModifiedField = true;
           if (
@@ -231,32 +225,45 @@
           if (
             field === "amount_with_nds" &&
             amountWithNds &&
-            amountWithNds !== "0" &&
             amountWithNds !== "0,00"
           )
             hasNonEmptyModifiedField = true;
-          if (
-            field === "amount_nds" &&
-            amountNds &&
-            amountNds !== "0" &&
-            amountNds !== "0,00"
-          )
+          if (field === "amount_nds" && amountNds && amountNds !== "0,00")
             hasNonEmptyModifiedField = true;
         }
       }
 
       if (hasNonEmptyModifiedField) {
-        if (!name || name.trim() === "") errors.push("name");
-        if (!settlementAccount || settlementAccount.trim() === "")
+        // Проверяем только те поля, которые были изменены
+        if (
+          modifiedFieldsForRow?.has("name") &&
+          (!name || name.trim() === "")
+        ) {
+          errors.push("name");
+        }
+        if (
+          modifiedFieldsForRow?.has("settlement_account_number") &&
+          (!settlementAccount || settlementAccount.trim() === "")
+        ) {
           errors.push("settlement_account_number");
-        if (!amountWithNds || amountWithNds === "0" || amountWithNds === "0,00")
+        }
+        if (
+          modifiedFieldsForRow?.has("amount_with_nds") &&
+          (!amountWithNds || amountWithNds === "0,00")
+        ) {
           errors.push("amount_with_nds");
-        if (!amountNds || amountNds === "0" || amountNds === "0,00")
+        }
+        if (
+          modifiedFieldsForRow?.has("amount_nds") &&
+          (!amountNds || amountNds === "0,00")
+        ) {
           errors.push("amount_nds");
-        if (!row.file_ids || row.file_ids.length === 0) errors.push("files");
+        }
+        if (!hasFileIds) errors.push("files");
       }
 
-      if (modifiedFields.value[index] && !hasNonEmptyModifiedField) {
+      // Очищаем modifiedFields если нет непустых измененных полей
+      if (modifiedFieldsForRow && !hasNonEmptyModifiedField) {
         const { [index]: _, ...rest } = modifiedFields.value;
         modifiedFields.value = rest;
       }
@@ -271,47 +278,29 @@
   };
 
   const hasAmountInRow = (row: CashTableRow, index: number): boolean => {
-    const amountWithNds = row.amount_with_nds;
-    const amountNds = row.amount_nds;
-    const settlementAccount = row.settlement_account_number;
-
-    const hasNonZeroAmount =
-      (amountWithNds && amountWithNds !== "0" && amountWithNds !== "0,00") ||
-      (amountNds && amountNds !== "0" && amountNds !== "0,00");
-
-    const hasSettlementAccount =
-      settlementAccount && settlementAccount.trim() !== "";
-
     const isNewlyAddedRow = addedRowsIndices.value.includes(index);
     if (isNewlyAddedRow) return true;
 
-    if (hasNonZeroAmount || hasSettlementAccount) return true;
-
     let hasNonEmptyModifiedField = false;
     if (modifiedFields.value[index]) {
+      const hasAmountWithNds =
+        row.amount_with_nds && row.amount_with_nds !== "0,00";
+      const hasAmountNds = row.amount_nds && row.amount_nds !== "0,00";
       const hasName = row.name && row.name.trim() !== "";
+      const hasSettlementAccount =
+        row.settlement_account_number &&
+        row.settlement_account_number.trim() !== "";
 
       for (const field of modifiedFields.value[index]) {
         if (field === "name" && hasName) hasNonEmptyModifiedField = true;
         if (field === "settlement_account_number" && hasSettlementAccount)
           hasNonEmptyModifiedField = true;
-        if (
-          field === "amount_with_nds" &&
-          amountWithNds &&
-          amountWithNds !== "0" &&
-          amountWithNds !== "0,00"
-        )
+        if (field === "amount_with_nds" && hasAmountWithNds)
           hasNonEmptyModifiedField = true;
-        if (
-          field === "amount_nds" &&
-          amountNds &&
-          amountNds !== "0" &&
-          amountNds !== "0,00"
-        )
+        if (field === "amount_nds" && hasAmountNds)
           hasNonEmptyModifiedField = true;
       }
     }
-
     return hasNonEmptyModifiedField;
   };
 
@@ -357,20 +346,6 @@
     };
   };
 
-  const formattedRows = computed(() => {
-    return editableRows.value.map((row) => ({
-      ...row,
-      amount_with_nds: formatForDisplay(row.amount_with_nds),
-      amount_nds: formatForDisplay(row.amount_nds),
-    }));
-  });
-
-  const formatForDisplay = (value: string): string => {
-    if (value === "0" || value === "0.00") return "0,00";
-    if (value && !value.includes(",")) return value + ",00";
-    return value;
-  };
-
   const emitUpdate = () => {
     emit("update:tableData", [...editableRows.value]);
     emit("update:totalSumm", Number(totalWithVAT.value));
@@ -391,6 +366,8 @@
     tableMessage.value = "Основание добавлено";
     emitUpdate();
     emit("rows-added", [newIndex]);
+
+    validateRow(newIndex);
   };
 
   const removeLastRow = () => {
@@ -406,6 +383,9 @@
 
     const { [lastAddedIndex]: _, ...rest } = invalidFields.value;
     invalidFields.value = rest;
+
+    const { [lastAddedIndex]: __, ...restModified } = modifiedFields.value;
+    modifiedFields.value = restModified;
 
     addedRowsIndices.value = currentIndices
       .filter((index) => index !== lastAddedIndex)
@@ -428,31 +408,24 @@
   const finishNameEditing = (index: number) => {
     editingNameIndex.value = null;
     validateRow(index);
+    emitUpdate();
   };
 
   watch(
     () => props.initialData,
-    async (newData) => {
+    (newData) => {
       if (JSON.stringify(newData) !== JSON.stringify(editableRows.value)) {
-        const normalizedData = newData?.length
+        editableRows.value = newData?.length
           ? newData.map(normalizeRowData)
           : [createEmptyRow()];
-
-        editableRows.value = [];
-        await nextTick();
-        editableRows.value = normalizedData;
-
         addedRowsIndices.value = [];
         invalidFields.value = {};
+        modifiedFields.value = {};
 
-        await nextTick();
-
-        editableRows.value.forEach((row, index) => {
-          validateRow(index);
-        });
+        editableRows.value.forEach((_, index) => validateRow(index));
       }
     },
-    { immediate: true, deep: true },
+    { immediate: true },
   );
 
   const getTableData = () => ({
@@ -464,8 +437,9 @@
   });
 
   const setData = (newData: CashTableRow[]) => {
-    editableRows.value = [...newData];
+    editableRows.value = newData.map(normalizeRowData);
     invalidFields.value = {};
+    modifiedFields.value = {};
     editableRows.value.forEach((_, index) => validateRow(index));
   };
 
@@ -506,7 +480,7 @@
             :class="[
               'name-input',
               {
-                [$style.errorInput]: invalidFields[index]?.includes('name'),
+                [$style.errorInput]: shouldShowError(index, 'name'),
               },
             ]"
             @input="handleNameChange(index, $event)"
@@ -525,7 +499,8 @@
           :value="row.settlement_account_number || ''"
           placeholder="введите номер"
           :class="{
-            [$style.errorInput]: invalidFields[index]?.includes(
+            [$style.errorInput]: shouldShowError(
+              index,
               'settlement_account_number',
             ),
           }"
@@ -537,18 +512,13 @@
       <div class="cell" :class="$style.cellRow">
         <div>
           <input
-            :key="`amount_with_nds_${index}_${row.amount_with_nds}`"
             type="text"
-            :value="formattedRows[index].amount_with_nds"
+            :value="row.amount_with_nds"
             placeholder="0,00"
-            pattern="[0-9]*[.,]?[0-9]*"
             :class="[
               $style.inputField,
               {
-                [$style.errorInput]: shouldShowNumberError(
-                  index,
-                  'amount_with_nds',
-                ),
+                [$style.errorInput]: shouldShowError(index, 'amount_with_nds'),
               },
             ]"
             @input="handleNumberInput($event, 'amount_with_nds', index)"
@@ -557,15 +527,13 @@
         </div>
         <div>
           <input
-            :key="`amount_nds_${index}_${row.amount_nds}`"
             type="text"
-            :value="formattedRows[index].amount_nds"
+            :value="row.amount_nds"
             placeholder="0,00"
-            pattern="[0-9]*[.,]?[0-9]*"
             :class="[
               $style.inputField,
               {
-                [$style.errorInput]: shouldShowNumberError(index, 'amount_nds'),
+                [$style.errorInput]: shouldShowError(index, 'amount_nds'),
               },
             ]"
             @input="handleNumberInput($event, 'amount_nds', index)"
@@ -584,6 +552,7 @@
           :files="row.files || []"
           :file-ids="row.file_ids || []"
           :is-required="hasAmountInRow(row, index)"
+          :has-error="shouldShowError(index, 'files')"
           @files-uploaded="
             ({ filesData }) => handleFileUploaded({ index, filesData })
           "
@@ -637,5 +606,24 @@
   .errorInput {
     border-color: var(--a-borderError) !important;
     background-color: var(--a-bgErrorLight) !important;
+  }
+
+  .name-input {
+    width: 100%;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--a-borderAccentLight);
+    background-color: var(--a-mainBg);
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: var(--a-borderAccent);
+    }
+
+    &.errorInput {
+      border-color: var(--a-borderError) !important;
+      background-color: var(--a-bgErrorLight) !important;
+    }
   }
 </style>
