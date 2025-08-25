@@ -41,7 +41,53 @@
   }
 
   const props = defineProps<Props>();
-  const emit = defineEmits(["pageChange", "sortChange"]);
+  const emit = defineEmits(["pageChange", "sortChange", "selectionChange"]);
+
+  // Состояние для выбранных элементов
+  const selectedReports = ref<Set<number>>(new Set());
+  const isAllSelected = ref(false);
+
+  // Функция для массового выбора/снятия выбора
+  const toggleAllSelection = () => {
+    if (isAllSelected.value) {
+      selectedReports.value.clear();
+    } else {
+      // Выбираем только черновики
+      props.reports.forEach((report) => {
+        if (report.status === "Draft" && report.can_edit) {
+          selectedReports.value.add(report.id);
+        }
+      });
+    }
+    isAllSelected.value = !isAllSelected.value;
+    emitSelectionChange();
+  };
+
+  // Функция для переключения выбора отдельного отчета
+  const toggleReportSelection = (reportId: number, status: string) => {
+    if (status !== "Draft") return;
+
+    if (selectedReports.value.has(reportId)) {
+      selectedReports.value.delete(reportId);
+    } else {
+      selectedReports.value.add(reportId);
+    }
+
+    // Обновляем состояние массового выбора
+    const draftReports = props.reports.filter(
+      (r) => r.status === "Draft" && r.can_edit,
+    );
+    isAllSelected.value =
+      draftReports.length > 0 &&
+      draftReports.every((r) => selectedReports.value.has(r.id));
+
+    emitSelectionChange();
+  };
+
+  // Эмитим событие с выбранными отчетами
+  const emitSelectionChange = () => {
+    emit("selectionChange", Array.from(selectedReports.value));
+  };
 
   const columns = computed(() => {
     return props.headers.map((header) => {
@@ -90,6 +136,7 @@
               const statusMap: Record<string, string> = {
                 CorrectionRequested: "Запрошено исправление",
                 Submitted: "Сформирован",
+                Draft: "Черновик",
               };
               return statusMap[row.original.status] || row.original.status;
             },
@@ -104,20 +151,59 @@
           return {
             ...baseColumn,
             size: 120,
+            header: () =>
+              h("div", { class: $style.headerWithCheckbox }, [
+                h("span", { class: $style.headerLabel }, header.label),
+                h("input", {
+                  type: "checkbox",
+                  checked: isAllSelected.value,
+                  onChange: toggleAllSelection,
+                  class: $style.headerCheckbox,
+                  title: "Выбрать все черновики",
+                }),
+              ]),
             cell: ({ row }) => {
-              if (!row.original.can_edit) return null;
-              return h(
-                "button",
-                {
-                  class: $style.editButton,
-                  onClick: (e) => {
-                    e.stopPropagation();
-                    // Здесь будет переход на страницу редактирования
-                    navigateTo(`/reports/edit/${row.original.id}`);
+              const report = row.original;
+
+              // Если это не черновик или нельзя редактировать, показываем только кнопку редактирования
+              if (report.status !== "Draft" || !report.can_edit) {
+                if (!report.can_edit) return null;
+
+                return h(
+                  "button",
+                  {
+                    class: $style.editButton,
+                    onClick: (e) => {
+                      e.stopPropagation();
+                      navigateTo(`/reports/edit/${report.id}`);
+                    },
                   },
-                },
-                [h(IconEdit, { class: $style.editIcon })],
-              );
+                  [h(IconEdit, { class: $style.editIcon })],
+                );
+              }
+
+              // Для черновиков показываем чекбокс и кнопку редактирования
+              return h("div", { class: $style.editCell }, [
+                h(
+                  "button",
+                  {
+                    class: $style.editButton,
+                    onClick: (e) => {
+                      e.stopPropagation();
+                      navigateTo(`/reports/edit/${report.id}`);
+                    },
+                  },
+                  [h(IconEdit, { class: $style.editIcon })],
+                ),
+                h("input", {
+                  type: "checkbox",
+                  checked: selectedReports.value.has(report.id),
+                  onChange: () =>
+                    toggleReportSelection(report.id, report.status),
+                  class: $style.rowCheckbox,
+                  title: "Выбрать черновик",
+                }),
+              ]);
             },
           };
         case "can_download_documents":
@@ -370,7 +456,7 @@
     }
 
     &::-webkit-scrollbar-track {
-      background: var(--a-bgLight); // Цвет трека
+      background: var(--a-bgLight);
       border-radius: rem(4);
       margin: rem(4) 0;
     }
@@ -385,11 +471,8 @@
       }
     }
 
-    /* Стили для Firefox */
     scrollbar-width: thin;
     scrollbar-color: var(--a-borderAccent) var(--a-bgLight);
-
-    /* Стили для IE/Edge */
     -ms-overflow-style: -ms-autohiding-scrollbar;
   }
 
@@ -431,6 +514,43 @@
     user-select: none;
   }
 
+  .headerWithCheckbox {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: rem(8);
+  }
+
+  .headerLabel {
+    font-size: rem(12);
+    font-weight: 600;
+  }
+
+  .headerCheckbox,
+  .rowCheckbox {
+    width: rem(16);
+    height: rem(16);
+    cursor: pointer;
+    background-color: var(--a-bgAccentDark);
+    color: var(--a-errorText);
+
+    &:focus {
+      outline: 2px solid var(--a-borderAccent);
+      outline-offset: 2px;
+    }
+    &:checked {
+      background-color: var(--a-bgAccentDark);
+      color: var(--a-errorText);
+    }
+  }
+
+  .editCell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: rem(8);
+  }
+
   .sortIcon {
     svg {
       width: rem(16);
@@ -465,6 +585,30 @@
         border-right: none;
       }
     }
+  }
+
+  .editButton {
+    background: none;
+    border: none;
+    padding: rem(4);
+    border-radius: rem(4);
+    cursor: pointer;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background-color: var(--a-bgAccentExLight);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  .editIcon {
+    width: rem(16);
+    height: rem(16);
+    color: var(--a-bgAccentDark);
   }
 
   .footer {

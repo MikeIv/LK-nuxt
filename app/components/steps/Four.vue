@@ -208,8 +208,8 @@
   .table {
     display: grid;
     grid-template-columns: 1fr 240px 240px;
-    max-width: rem(900);
-    border: 1px solid var(--a-borderLght);
+    max-width: rem(820);
+    border: none;
     font-size: rem(14);
   }
 
@@ -221,7 +221,7 @@
     display: flex;
     justify-content: center;
     padding: rem(12) rem(8);
-    background-color: var(--a-bgAccentExLight);
+    background-color: var(--a-bgLight);
     font-weight: bold;
     text-align: center;
 
@@ -231,19 +231,24 @@
   }
 
   .tableCell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     padding: rem(12) rem(8);
-    background-color: var(--a-bgTable);
+    background-color: var(--a-white);
     border-bottom: 1px solid var(--a-borderLght);
     border-right: 1px solid var(--a-borderLght);
-    display: flex;
-    align-items: center;
+    font-weight: 600;
+    color: var(--a-accentTextExDark);
   }
 
   .nameCell {
     display: flex;
+    justify-content: flex-start;
     align-items: center;
     font-weight: 600;
-    background-color: var(--a-bgAccentExLight);
+    color: var(--a-mainText);
+    background-color: var(--a-white);
   }
 
   .sumCell {
