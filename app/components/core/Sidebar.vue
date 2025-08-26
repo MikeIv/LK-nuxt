@@ -22,6 +22,7 @@
     { to: "/", icon: "i-home", text: "На главную" },
     { to: "/record", icon: "i-report", text: "Сформировать отчет" },
     { to: "/archive", icon: "i-archive", text: "Архив отчетов" },
+    { to: "/applications", icon: "i-archive", text: "Мои заявки" },
     { to: "/cashiers", icon: "i-cashier", text: "Мои кассы" },
   ];
 
