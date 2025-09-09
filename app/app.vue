@@ -1,5 +1,5 @@
 <template>
-  <UApp>
+  <UApp :toaster="toaster">
     <NuxtLayout>
       <!-- Индикатор загрузки между страницами -->
       <!--      <NuxtLoadingIndicator :color="'#00dc82'" :height="3" />-->
@@ -14,7 +14,7 @@
 
 <script setup>
   useHead({
-    titleTemplate: (title) => (title ? `${title} | Личный кабинет` : "ЛК"),
+    titleTemplate: (title) => (title ? `${title} | ЛК` : "Личный кабинет"),
     meta: [
       { charset: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
@@ -29,16 +29,11 @@
       class: "min-h-screen bg-gray-50",
     },
   });
+
+  const toaster = { duration: 7000 };
 </script>
 
 <style>
-  @font-face {
-    font-family: "Roboto";
-    src: url("~/assets/fonts/Montserrat.woff2") format("woff2");
-    font-weight: 400;
-    font-display: swap;
-  }
-
   html {
     scroll-behavior: smooth;
   }
@@ -46,4 +41,3 @@
     font-family: "Montserrat", sans-serif;
   }
 </style>
-

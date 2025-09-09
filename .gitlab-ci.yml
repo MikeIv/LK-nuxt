@@ -4,53 +4,29 @@ stages:
 
 build frontend:
   stage: build
-  image: node:20.10-alpine
+  image: node:20.19-alpine
   variables:
-#    VITE_BASE_API_URL: https://lk-schelkovsky-api.dev.nuu.ru/api/v1/
-    VITE_BASE_API_URL: https://lk-schelk.holyhands.ru/api/v1/
+    BASE_API_URL: https://lk-schelkovsky-api.dev.nuu.ru
   script:
     - npm install
-    - npm run build-only
+    - npm run build
   artifacts:
     paths:
-      - public
+      - .output
   rules:
     - if: $CI_COMMIT_BRANCH && $CI_COMMIT_REF_PROTECTED == 'true'
   tags:
     - docker
     - $CI_JOB_STAGE
 
-deploy prod:
-  stage: deploy
-  environment:
-    name: prod
-    url: https://lk-schelkovsky-prod.dev.nuu.ru/
-  script:
-    - cp -rf public /home/webuser/lk-schelkovsky/${CI_COMMIT_BRANCH}
-    - cd /home/webuser/lk-schelkovsky/${CI_COMMIT_BRANCH}
-    - git pull ${CI_REPOSITORY_URL} ${CI_COMMIT_BRANCH}
-    - |
-      # Telegram notification publish
-      CI_ESCAPED_AUTHOR=`echo $CI_COMMIT_AUTHOR | sed -e "s/</\&lt;/" -e "s/>/\&gt;/"`
-      curl -s -X POST -H "Content-Type: application/json" \
-        -d "{\"chat_id\":${TELEGRAM_GROUP},\"parse_mode\":\"HTML\",\"disable_web_page_preview\":true,\"text\":\"Загружено <a href='${CI_ENVIRONMENT_URL}'><b>${CI_PROJECT_NAME} / ${CI_ENVIRONMENT_NAME}</b></a>\nВетка: ${CI_COMMIT_BRANCH}\nАвтор: ${CI_ESCAPED_AUTHOR}\nTitle: ${CI_COMMIT_TITLE}\"}" \
-        https://api.telegram.org/bot${TELEGRAM_BOT}/sendMessage > /dev/null
-  only:
-    refs:
-      - main
-  tags:
-    - shell
-    - $CI_JOB_STAGE
-    - dev
-
 deploy develop:
   stage: deploy
   environment:
     name: dev
-    url: https://lk-schelkovsky.dev.nuu.ru/
+    url: https://lk-schelkovsky.grandfs-develop.ru/
   script:
-    - cp -rf public /home/webuser/lk-schelkovsky/${CI_COMMIT_BRANCH}
-    - cd /home/webuser/lk-schelkovsky/${CI_COMMIT_BRANCH}
+    - cp -rf .output /var/www/shelkovskiy/lk-schelkovsky-n4/${CI_COMMIT_BRANCH}
+    - cd /var/www/shelkovskiy/lk-schelkovsky-n4/${CI_COMMIT_BRANCH}
     - git pull ${CI_REPOSITORY_URL} ${CI_COMMIT_BRANCH}
     - |
       # Telegram notification publish
@@ -63,5 +39,4 @@ deploy develop:
       - develop
   tags:
     - shell
-    - $CI_JOB_STAGE
-    - $CI_ENVIRONMENT_NAME
+    - grand208

@@ -1,21 +1,26 @@
 <script setup lang="ts">
   import { useAuthStore } from "~/stores/auth";
-  import { useUserStore } from "~/stores/user";
+  import { useUserStore } from "~/stores/userData";
   import { useApi } from "~/composables/useApi";
+  import { useStepTwoStore } from "~/stores/stepTwo";
+  import { useUserData } from "../../composables/useUser";
 
   const userStore = useUserStore();
-  const { isLoading, error } = useApi<unknown>();
+  const { fetchUser } = useUserData();
 
   const authStore = useAuthStore();
+  const { isLoading, error } = useApi<unknown>();
 
   const userInfo = computed(() => {
-    if (!userStore.user) return null;
+    console.log("USER from userData store HEADER:", userStore.user);
+
+    const user = userStore.user;
+    if (!user) return null;
+
     return [
-      userStore.user.tenant_name,
-      userStore.user.brand,
-      userStore.user.contract_number
-        ? `Договор ${userStore.user.contract_number}`
-        : null,
+      user?.tenant_name,
+      user?.brand,
+      user?.contract_number ? `Договор ${user?.contract_number}` : null,
     ]
       .filter(Boolean)
       .join(", ");
@@ -34,7 +39,16 @@
 
     try {
       isLoading.value = true;
+
+      const stepOneStore = useStepOneStore();
+      const stepTwoStore = useStepTwoStore();
+      stepOneStore.reset();
+      stepTwoStore.$reset();
+
       await authStore.logOut();
+
+      // Очищаем данные пользователя при выходе
+      userStore.clearUser();
 
       if (import.meta.env.VITE_API_DATA_ONLY_MODE) {
         authStore.$patch({
@@ -51,12 +65,12 @@
       useToast().add({
         title: "Ошибка выхода",
         description: "Не удалось завершить сеанс",
-        color: "red",
-        icon: "i-heroicons-exclamation-triangle",
+        color: "primary",
+        icon: "i-heroicons-x-circle",
         ui: {
-          background: "bg-red-50 dark:bg-red-900/50",
-          title: "text-red-800 dark:text-red-100",
-          description: "text-red-700 dark:text-red-200",
+          wrapper: "",
+          title: "text-[#292d3e]",
+          description: "text-[#e37508]",
         },
       });
     } finally {
@@ -75,22 +89,17 @@
 
   const hasContractsToShow = computed(() => filteredContracts.value.length > 0);
 
-  const handleContractChange = async (contractId: number) => {
-    const { isLoading, error } = useApi<unknown>();
-
+  const handleContractChange = async () => {
     try {
       isLoading.value = true;
       error.value = null;
 
-      await userStore.changeContract(contractId);
-
       await refreshNuxtData();
       await navigateTo({ path: "/" }, { replace: true });
     } catch (e: unknown) {
-      error.value =
-        e instanceof Error
-          ? e
-          : new Error("Ошибка переключения договора", { cause: e });
+      const errorMessage =
+        e instanceof Error ? e.message : "Ошибка переключения договора";
+      error.value = new Error(errorMessage, { cause: e });
 
       console.error("Failed to change contract:", error.value);
 
@@ -105,13 +114,11 @@
   };
 
   onMounted(async () => {
-    await userStore.getUser();
-
-    // Альтернативно: можно загружать напрямую через useApi
-    // await fetchData('/api/user/me');
-    // if (userData.value) {
-    //   userStore.user = userData.value;
-    // }
+    if (!userStore.user) {
+      console.log("Fetching user data...");
+      await fetchUser();
+    }
+    console.log("User data from userData store:", userStore.user);
   });
 </script>
 
@@ -141,9 +148,11 @@
         />
       </div>
     </div>
-
-    <div v-if="userInfo" :class="$style.bottomRow">
-      {{ userInfo }}
+    <div :class="$style.bottomRow">
+      <p v-if="userInfo">{{ userInfo }}</p>
+      <p v-else-if="userStore.isLoading">Загрузка данных пользователя...</p>
+      <p v-else-if="userStore.error">Ошибка: {{ userStore.error }}</p>
+      <p v-else>Пользователь не авторизован</p>
     </div>
 
     <div v-if="error" :class="$style.error">

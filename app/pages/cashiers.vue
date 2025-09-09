@@ -1,41 +1,194 @@
 <script setup lang="ts">
-  // import { computed, nextTick, onMounted, ref, watch } from "vue";
-  // import IconCloseBtn from "@/components/icons/IconCloseBtn.vue";
-  // import IconEditing from "@/components/icons/IconEditing.vue";
-  // import { useCashersStore } from "~/stores/cashers";
-  import VueDatePicker from "@vuepic/vue-datepicker";
-  import "@vuepic/vue-datepicker/dist/main.css";
-  // import { useSaveCashiers } from "~/composables/useSaveCashiers";
-  // import { useLogin } from "~/stores/auth.ts";
-
-  // const { kktData, kktLoading, kktError, loadKktData } = useKkt();
-
-  // const store = useLogin();
-  const cashersStore = useCashersStore();
-  // const { data, loading, fetchReport } = useDataKkt();
-  // const { saveCashiers, error: saveError } = useSaveCashiers();
-
-  interface Casher {
-    id: number | null;
+  interface Cashier {
+    id?: string | null;
     name: string;
     registration_number: string;
     serial_number: string;
     fn_number: string;
-    registered_at: string | null;
-    installed_at: string | null;
+    registered_at: Date | string | null;
+    installed_at: Date | string | null;
     order: number;
-    isEditingTitle?: boolean;
-    isCustom?: boolean;
-    tempId?: string;
     isDirty?: boolean;
+    isCustom?: boolean;
   }
 
+  const {
+    callApi: loadKktData,
+    data: kktData,
+    isLoading: kktLoading,
+  } = useApi<Cashier[]>();
+
+  const {
+    callApi: saveKktData,
+    isLoading: isSaving,
+    fullResponse: saveResponse,
+  } = useApi();
+
+  const allTables = ref<Cashier[]>([]);
   const saveMessage = ref("");
   const isError = ref(false);
-  const isSaving = ref(false);
-  const titleInputs = ref<HTMLInputElement[]>([]);
-  const initialData = ref<Casher[]>([]);
-  const isInitialLoad = ref(true);
+  const invalidFields = ref<Record<string, boolean>>({});
+
+  const hasChanges = computed(() => {
+    if (kktData.value && allTables.value.length !== kktData.value.length) {
+      return true;
+    }
+
+    return allTables.value.some((table) => table.isDirty || table.isCustom);
+  });
+
+  const { setupGuard } = useUnsavedChangesGuard(hasChanges);
+
+  const addBlock = () => {
+    const blockNumber = allTables.value.length + 1;
+    const name = `Касса ${blockNumber}`;
+
+    allTables.value.push({
+      name,
+      _originalName: name,
+      registration_number: "",
+      serial_number: "",
+      fn_number: "",
+      registered_at: null,
+      installed_at: null,
+      order: blockNumber,
+      isDirty: true,
+      isCustom: true,
+    });
+
+    showMessage("Добавлен новый блок");
+    nextTick(() => {
+      const tables = document.querySelectorAll(".table");
+      tables[tables.length - 1]?.scrollIntoView({ behavior: "smooth" });
+    });
+  };
+
+  const removeBlock = (block: Cashier) => {
+    if (!confirm("Вы уверены, что хотите удалить эту кассу?")) return;
+
+    const index = allTables.value.findIndex(
+      (b) =>
+        (block.id && b.id === block.id) ||
+        (!block.id && b.order === block.order),
+    );
+
+    if (index !== -1) {
+      if (block.id) {
+        allTables.value.forEach((t) => (t.isDirty = true));
+      }
+
+      allTables.value.splice(index, 1);
+      showMessage("Касса удалена");
+
+      allTables.value.forEach((table, idx) => {
+        table.order = idx + 1;
+      });
+    }
+  };
+
+  const validateBeforeSave = () => {
+    invalidFields.value = {};
+    let isValid = true;
+
+    allTables.value.forEach((block, index) => {
+      if (!block.isDirty && !block.isCustom) return;
+
+      if (!block.name?.trim()) {
+        invalidFields.value[`name-${index}`] = true;
+        isValid = false;
+      }
+
+      if (
+        block.isCustom &&
+        (!block.registration_number || block.registration_number.length !== 16)
+      ) {
+        invalidFields.value[`regNum-${index}`] = true;
+        isValid = false;
+      }
+
+      if (!block.serial_number?.trim()) {
+        invalidFields.value[`serialNum-${index}`] = true;
+        isValid = false;
+      }
+
+      if (!block.fn_number?.trim()) {
+        invalidFields.value[`fnNum-${index}`] = true;
+        isValid = false;
+      }
+
+      if (!block.registered_at) {
+        invalidFields.value[`regDate-${index}`] = true;
+        isValid = false;
+      }
+
+      if (!block.installed_at) {
+        invalidFields.value[`instDate-${index}`] = true;
+        isValid = false;
+      }
+    });
+
+    return isValid;
+  };
+
+  const saveData = async () => {
+    if (isSaving.value) return;
+    if (!validateBeforeSave()) {
+      showMessage("Заполните все обязательные поля", true);
+      return;
+    }
+
+    try {
+      const formattedData = {
+        kkts: allTables.value.map((table) => ({
+          id: table.id || null,
+          name: table.name,
+          registration_number: table.registration_number,
+          serial_number: table.serial_number,
+          fn_number: table.fn_number,
+          registered_at: formatDateForApi(table.registered_at),
+          installed_at: formatDateForApi(table.installed_at),
+        })),
+      };
+
+      function formatDateForApi(date: Date | string | null): string | null {
+        if (!date) return null;
+        const d = new Date(date);
+        return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
+      }
+
+      await saveKktData("/tenants/kkts", {
+        method: "POST",
+        body: formattedData,
+      });
+
+      if (!saveResponse.value || saveResponse.value.success !== true) {
+        const errorMsg = saveResponse.value?.message || "Ошибка при сохранении";
+        showMessage(errorMsg, true);
+        return;
+      }
+
+      allTables.value = allTables.value.map((table) => ({
+        ...table,
+        isDirty: false,
+        isCustom: false,
+      }));
+
+      showMessage(saveResponse.value.message || "Данные успешно сохранены");
+
+      await loadKktData("/tenants/kkts");
+      if (kktData.value) {
+        allTables.value = kktData.value.map((table, index) => ({
+          ...table,
+          order: index + 1,
+          isDirty: false,
+          isCustom: false,
+        }));
+      }
+    } catch (err) {
+      console.error("Ошибка сохранения:", err);
+      showMessage("Ошибка при сохранении данных", true);
+    }
+  };
 
   const updateData = async () => {
     if (!hasChanges.value) {
@@ -47,325 +200,76 @@
       return;
     }
 
-    isSaving.value = true;
     try {
-      cashersStore.resetChanges();
-      // Возвращаем initialData после отмены
-      initialData.value = JSON.parse(JSON.stringify(cashersStore.initialData));
+      await loadKktData("/tenants/kkts");
+      if (kktData.value) {
+        allTables.value = kktData.value.map((table) => ({
+          ...table,
+          isDirty: false,
+          isCustom: false,
+        }));
+      }
       showMessage("Изменения отменены");
     } catch (err) {
       console.error("Ошибка при отмене изменений:", err);
       showMessage("Ошибка при отмене изменений", true);
-    } finally {
-      isSaving.value = false;
     }
   };
 
-  const validateRegistrationNumber = (
-    event: Event,
-    block: unknown,
-    index: number,
-  ) => {
-    const input = event.target as HTMLInputElement;
-    let value = input.value.replace(/\D/g, "");
+  const hasEmptyFields = computed(() => {
+    return allTables.value.some((table) => {
+      if (!table.isDirty && !table.isCustom) return false;
 
-    if (value.length > 16) {
-      value = value.slice(0, 16);
-    }
+      const requiredFieldsValid =
+        table.name?.trim() &&
+        table.serial_number?.trim() &&
+        table.fn_number?.trim() &&
+        table.registered_at &&
+        table.installed_at;
 
-    block.registration_number = value;
-    input.value = value;
-    handleFieldChange(block);
+      if (table.isCustom) {
+        return !(
+          requiredFieldsValid && table.registration_number?.length === 16
+        );
+      }
 
-    const fieldKey = `regNum-${index}`;
-    if (value.length === 16) {
-      clearFieldError(fieldKey);
-    }
-  };
-
-  const validateDigitsInput = (
-    event: Event,
-    field: string,
-    block: unknown,
-    index: number,
-  ) => {
-    const input = event.target as HTMLInputElement;
-    const value = input.value.replace(/\D/g, "");
-    block[field] = value;
-    input.value = value;
-    handleFieldChange(block);
-
-    const fieldKey = `${field === "serial_number" ? "serialNum" : "fnNum"}-${index}`;
-    clearFieldError(fieldKey);
-  };
-
-  const invalidFields = ref<Record<string, boolean>>({});
-
-  // const validateBeforeSave = () => {
-  //   invalidFields.value = {};
-  //
-  //   cashersStore.allCashers.forEach((block, index) => {
-  //     const isNewBlock = block.id === null;
-  //     const shouldValidate = isNewBlock || block.isDirty;
-  //
-  //     if (!shouldValidate) return;
-  //
-  //     if (!block.name?.trim()) {
-  //       invalidFields.value[`name-${index}`] = true;
-  //     }
-  //     if (
-  //       !block.registration_number ||
-  //       block.registration_number.length !== 16
-  //     ) {
-  //       invalidFields.value[`regNum-${index}`] = true;
-  //     }
-  //     if (!block.serial_number?.trim()) {
-  //       invalidFields.value[`serialNum-${index}`] = true;
-  //     }
-  //     if (!block.fn_number?.trim()) {
-  //       invalidFields.value[`fnNum-${index}`] = true;
-  //     }
-  //     if (!block.registered_at) {
-  //       invalidFields.value[`regDate-${index}`] = true;
-  //     }
-  //     if (!block.installed_at) {
-  //       invalidFields.value[`instDate-${index}`] = true;
-  //     }
-  //   });
-  //
-  //   return Object.keys(invalidFields.value).length === 0;
-  // };
-
-  watch(
-    () => cashersStore.allCashers,
-    (newVal) => {
-      newVal.forEach((block, index) => {
-        if (block.serial_number?.trim()) {
-          clearFieldError(`serialNum-${index}`);
-        }
-        if (block.fn_number?.trim()) {
-          clearFieldError(`fnNum-${index}`);
-        }
-      });
-    },
-    { deep: true },
-  );
-
-  const handleFieldChange = (block: unknown) => {
-    block.isDirty = true;
-  };
-
-  const handleDateChange = (
-    block: unknown,
-    field: "registered_at" | "installed_at",
-    date: Date | null,
-    index: number,
-  ) => {
-    block[field] = date;
-    handleFieldChange(block);
-
-    const fieldType = field === "registered_at" ? "regDate" : "instDate";
-    const fieldKey = `${fieldType}-${index}`;
-
-    if (date) {
-      clearFieldError(fieldKey);
-    } else if (invalidFields.value[fieldKey]) {
-      invalidFields.value[fieldKey] = true;
-    }
-  };
-
-  const handleTitleEditStart = async (block: unknown) => {
-    block.isEditingTitle = true;
-    await nextTick();
-
-    const index = cashersStore.allCashers.findIndex(
-      (b) =>
-        b.id === block.id ||
-        (b.id === null && block.id === null && b.name === block.name),
-    );
-
-    if (index !== -1 && titleInputs.value[index]) {
-      titleInputs.value[index].focus();
-      titleInputs.value[index].setSelectionRange(
-        0,
-        titleInputs.value[index].value.length,
-      );
-    }
-  };
-
-  const clearFieldError = (fieldKey: string) => {
-    if (invalidFields.value[fieldKey]) {
-      const { [fieldKey]: _, ...rest } = invalidFields.value;
-      invalidFields.value = rest;
-    }
-  };
-
-  const handleTitleEditEnd = (block: unknown, index: number) => {
-    if (!block.name.trim()) {
-      block.name = "Касса " + block.order;
-    }
-    block.isEditingTitle = false;
-    handleFieldChange(block);
-
-    // Сбрасываем ошибку названия
-    const fieldKey = `name-${index}`;
-    if (block.name.trim()) {
-      clearFieldError(fieldKey);
-    }
-  };
-
-  const addBlock = () => {
-    const blockNumber = cashersStore.allCashers.length + 1;
-    const name = `Касса ${blockNumber}`;
-
-    cashersStore.addCustomCasher({
-      name: name,
-      registration_number: "",
-      serial_number: "",
-      fn_number: "",
-      registered_at: null,
-      installed_at: null,
-      order: blockNumber,
-      isDirty: false,
+      return !requiredFieldsValid;
     });
-
-    showMessage("Добавлен новый блок");
-
-    nextTick(() => {
-      const inputs = document.querySelectorAll(".registration-number-input");
-      const lastInput = inputs[inputs.length - 1] as HTMLInputElement;
-      lastInput?.focus();
-    });
-  };
-
-  const removeBlock = async (block: unknown) => {
-    if (!confirm("Вы уверены, что хотите удалить эту кассу?")) return;
-    cashersStore.removeCasher({
-      id: block.id,
-      tempId: block.tempId,
-    });
-    showMessage("Блок удален");
-  };
-
-  // const saveData = async () => {
-  //   if (!validateBeforeSave()) {
-  //     showMessage("Заполните все обязательные поля", true);
-  //     return;
-  //   }
-  //   isSaving.value = true;
-  //   try {
-  //     const changes = cashersStore.getChanges();
-  //     const response = await saveCashiers(changes);
-  //
-  //     if (response?.success) {
-  //       await fetchReport(store.contractId.toString());
-  //       if (data.value?.payload) {
-  //         initialData.value = JSON.parse(JSON.stringify(data.value.payload));
-  //         cashersStore.loadFromApi(data.value.payload);
-  //       }
-  //       showMessage(response?.message || "Данные успешно сохранены");
-  //       invalidFields.value = {};
-  //     } else {
-  //       showMessage(response?.message || "Ошибка при сохранении", true);
-  //     }
-  //   } catch (err) {
-  //     showMessage(saveError.value || "Ошибка при сохранении", true);
-  //     console.error("Ошибка сохранения:", err);
-  //   } finally {
-  //     isSaving.value = false;
-  //   }
-  // };
-
-  const hasChanges = computed(() => {
-    if (isInitialLoad.value || !cashersStore.allCashers.length) return false;
-
-    // Сравниваем текущее состояние с исходным
-    const currentState = cashersStore.allCashers.map((c) => ({
-      name: c.name,
-      registration_number: c.registration_number,
-      serial_number: c.serial_number,
-      fn_number: c.fn_number,
-      registered_at: c.registered_at,
-      installed_at: c.installed_at,
-      order: c.order,
-      id: c.id,
-    }));
-
-    const initialState = initialData.value.map((c) => ({
-      name: c.name,
-      registration_number: c.registration_number,
-      serial_number: c.serial_number,
-      fn_number: c.fn_number,
-      registered_at: c.registered_at,
-      installed_at: c.installed_at,
-      order: c.order,
-      id: c.id,
-    }));
-
-    // Проверяем изменения в данных
-    const dataChanged =
-      JSON.stringify(currentState) !== JSON.stringify(initialState);
-
-    // Проверяем наличие новых касс (без id)
-    const hasNewCashers = cashersStore.allCashers.some((c) => c.id === null);
-
-    return dataChanged || hasNewCashers;
   });
 
-  // Вспомогательные функции
   const showMessage = (message: string, error = false) => {
     saveMessage.value = message;
     isError.value = error;
     setTimeout(() => {
       saveMessage.value = "";
-    }, 3000);
+    }, 5000);
   };
 
-  const formatDate = (date: string | null): string => {
-    if (!date) return "--.--.----";
-    return new Date(date)
-      .toLocaleDateString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })
-      .replace(/\//g, ".");
-  };
-
-  const cashersState = ref(JSON.stringify(cashersStore.allCashers));
-
-  watch(
-    () => cashersStore.allCashers,
-    (newVal) => {
-      cashersState.value = JSON.stringify(newVal);
-    },
-    { deep: true },
-  );
-
-  // const waitForContractId = async (maxAttempts = 5, delay = 200) => {
-  //   for (let i = 0; i < maxAttempts; i++) {
-  //     if (store.contractId) return store.contractId;
-  //     await new Promise((resolve) => setTimeout(resolve, delay));
-  //   }
-  //   throw new Error("Contract ID not available");
-  // };
+  let cleanupGuard: (() => void) | null = null;
 
   onMounted(async () => {
-    // try {
-    //   const contractId = await waitForContractId();
-    //   await fetchReport(contractId.toString());
-    //
-    //   if (data.value?.payload) {
-    //     initialData.value = JSON.parse(JSON.stringify(data.value?.payload));
-    //     cashersStore.loadFromApi(data.value?.payload);
-    //     cashersState.value = JSON.stringify(data.value?.payload);
-    //   }
-    // } catch (err) {
-    //   console.error("Ошибка при загрузке данных:", err);
-    //   showMessage("Ошибка при загрузке данных", true);
-    // } finally {
-    //   isInitialLoad.value = false;
-    // }
+    try {
+      await loadKktData("/tenants/kkts");
+      if (kktData.value) {
+        allTables.value = kktData.value.map((table) => ({
+          ...table,
+          _originalName: table.name,
+          isDirty: false,
+          isCustom: false,
+        }));
+      }
+
+      cleanupGuard = setupGuard();
+    } catch (err) {
+      console.error("Ошибка загрузки данных:", err);
+      showMessage("Ошибка при загрузке данных ККТ", true);
+    }
+  });
+
+  onUnmounted(() => {
+    if (cleanupGuard) {
+      cleanupGuard();
+    }
   });
 </script>
 
@@ -375,244 +279,70 @@
       main-title="Мои кассы"
       step-title="Добавляйте и редактируйте информацию о Ваших кассах"
     />
-    <section class="record__view">
-      <div v-if="loading">Загрузка данных...</div>
+
+    <section :class="cashes.content">
+      <div v-if="kktLoading">Загрузка данных...</div>
 
       <template v-else>
-        <section class="casher-section">
-          <div
-            v-for="(block, index) in cashersStore.allCashers"
+        <section :class="cashes.section">
+          <CashiersTable
+            v-for="(block, index) in allTables"
             :key="block.id || `custom-${index}`"
-            class="record__item casher-block"
-          >
-            <div class="casher-block__title-wrapper">
-              <input
-                v-if="block.isEditingTitle"
-                ref="titleInput"
-                v-model="block.name"
-                class="casher-block__title-input"
-                :class="{
-                  'casher-block__title-input--edting': block.isEditingTitle,
-                  'error-field': invalidFields[`name-${index}`],
-                }"
-                type="text"
-                placeholder="Введите название кассы"
-                @keyup.enter="handleTitleEditEnd(block)"
-                @blur="handleTitleEditEnd(block, index)"
-              />
-              <p v-else class="casher-block__title-text">
-                {{ block.name || "Не указано" }}
-              </p>
-
-              <button
-                v-if="block.isEditingTitle"
-                class="casher-block__ok-btn"
-                type="button"
-                @click.stop="handleTitleEditEnd(block)"
-              >
-                OK
-              </button>
-
-              <button
-                v-if="!block.isEditingTitle"
-                class="casher-block__edit-btn"
-                type="button"
-                @click.stop="handleTitleEditStart(block)"
-              >
-                <IconEditing class="main-sidebar__icon small" />
-              </button>
-            </div>
-
-            <div class="casher-block__row">
-              <div class="casher-block__column">
-                <span class="casher-block__col-title"
-                  >Регистрационный номер ККТ</span
-                >
-                <input
-                  :value="block.registration_number"
-                  class="record__item-input registration-number-input casher-block__input"
-                  :class="{
-                    'readonly-input': !block.isCustom,
-                    'error-field':
-                      invalidFields[`regNum-${index}`] ||
-                      (block.registration_number &&
-                        block.registration_number.length !== 16),
-                  }"
-                  type="text"
-                  placeholder="Введите 16 цифр"
-                  :readonly="!block.isCustom"
-                  maxlength="16"
-                  inputmode="numeric"
-                  pattern="\d{16}"
-                  @input="validateRegistrationNumber($event, block, index)"
-                />
-                <small
-                  v-if="
-                    block.registration_number &&
-                    block.registration_number.length !== 16
-                  "
-                  class="casher-block__error-hint"
-                >
-                  Номер содержит ровно 16 цифр
-                </small>
-              </div>
-              <div class="casher-block__column">
-                <span class="casher-block__col-title">Заводской номер ККТ</span>
-                <input
-                  :value="block.serial_number"
-                  class="record__item-input casher-block__input"
-                  :class="{
-                    'error-field':
-                      invalidFields[`serialNum-${index}`] &&
-                      !block.serial_number?.trim(),
-                  }"
-                  type="text"
-                  placeholder="Введите номер"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  @input="
-                    validateDigitsInput($event, 'serial_number', block, index)
-                  "
-                />
-              </div>
-              <div class="casher-block__column">
-                <span class="casher-block__col-title"
-                  >Номер фискального накопителя</span
-                >
-                <input
-                  :value="block.fn_number"
-                  class="record__item-input casher-block__input"
-                  :class="{
-                    'error-field':
-                      invalidFields[`fnNum-${index}`] &&
-                      !block.fn_number?.trim(),
-                  }"
-                  type="text"
-                  placeholder="Введите номер"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  @input="
-                    validateDigitsInput($event, 'fn_number', block, index)
-                  "
-                />
-              </div>
-              <div class="casher-block__column">
-                <span class="casher-block__col-title"
-                  >Дата постановки на учёт</span
-                >
-                <VueDatePicker
-                  v-model="block.registered_at"
-                  :enable-time-picker="false"
-                  :format="formatDate"
-                  locale="ru"
-                  :max-date="new Date()"
-                  cancel-text="Отмена"
-                  select-text="Выбрать"
-                  :input-class-name="
-                    invalidFields[`regDate-${index}`]
-                      ? 'custom-datepicker-input error-field'
-                      : 'custom-datepicker-input'
-                  "
-                  placeholder="Выберите дату"
-                  class="casher-block__item-calendar"
-                  :class="{
-                    'error-data-field': invalidFields[`regDate-${index}`],
-                  }"
-                  @update:model-value="
-                    (date) =>
-                      handleDateChange(block, 'registered_at', date, index)
-                  "
-                />
-                <!--              <small-->
-                <!--                  v-if="invalidFields[`regDate-${index}`]"-->
-                <!--                  class="casher-block__error-message"-->
-                <!--              >-->
-                <!--                Обязательное поле-->
-                <!--              </small>-->
-              </div>
-              <div class="casher-block__column">
-                <span class="casher-block__col-title"
-                  >Дата установки в помещении</span
-                >
-                <VueDatePicker
-                  v-model="block.installed_at"
-                  :enable-time-picker="false"
-                  :format="formatDate"
-                  locale="ru"
-                  :max-date="new Date()"
-                  cancel-text="Отмена"
-                  select-text="Выбрать"
-                  :input-class-name="
-                    invalidFields[`instDate-${index}`]
-                      ? 'custom-datepicker-input error-field'
-                      : 'custom-datepicker-input'
-                  "
-                  placeholder="Выберите дату"
-                  class="casher-block__item-calendar"
-                  :class="{
-                    'error-data-field': invalidFields[`instDate-${index}`],
-                  }"
-                  @update:model-value="
-                    (date) =>
-                      handleDateChange(block, 'installed_at', date, index)
-                  "
-                />
-                <!--              <small-->
-                <!--                  v-if="invalidFields[`instDate-${index}`]"-->
-                <!--                  class="casher-block__error-message"-->
-                <!--              >-->
-                <!--                Обязательное поле-->
-                <!--              </small>-->
-              </div>
-
-              <button
-                type="button"
-                class="casher-block__delete-btn"
-                @click="removeBlock(block)"
-              >
-                <IconCloseBtn class="casher-block__icon" />
-              </button>
-            </div>
-          </div>
+            v-model:block="allTables[index]"
+            :index="index"
+            :invalid-fields="invalidFields"
+            :is-from-api="!!block.id"
+            :autofocus="block.isCustom && allTables.length - 1 === index"
+            @remove-block="removeBlock"
+          />
         </section>
       </template>
 
-      <div class="record__btn-row">
-        <div class="actions">
-          <button class="record__btn-base color" @click="addBlock">
+      <div :class="cashes.row">
+        <div :class="cashes.actions">
+          <button :class="[cashes.btn, cashes.btnAction]" @click="addBlock">
             Добавить кассу
           </button>
         </div>
       </div>
 
-      <div class="record__btn-row record__actions">
+      <div :class="cashes.row">
         <button
-          class="record__btn ghost"
-          :disabled="!hasChanges || isSaving"
+          :class="[cashes.btn, cashes.btnGhost]"
+          :disabled="!hasChanges || isSaving || hasEmptyFields"
+          :title="
+            !hasChanges
+              ? 'Нет изменений для сохранения'
+              : hasEmptyFields
+                ? 'Заполните все обязательные поля'
+                : 'Сохранить изменения'
+          "
           @click="saveData"
         >
-          <span class="record__btn-title">{{
-            isSaving ? "Сохранение..." : "Сохранить"
-          }}</span>
+          <span :class="cashes.btnTitle">
+            {{ isSaving ? "Сохранение..." : "Сохранить" }}
+          </span>
         </button>
 
         <button
-          class="record__btn ghost"
+          :class="[cashes.btn, cashes.btnGhost]"
           :disabled="!hasChanges || isSaving"
           @click="updateData"
         >
-          <span class="record__btn-title">{{
-            isSaving ? "Отмена..." : "Отменить"
-          }}</span>
+          <span :class="cashes.btnTitle">
+            {{ isSaving ? "Отмена..." : "Отменить" }}
+          </span>
         </button>
 
         <transition name="fade">
           <div
             v-if="saveMessage"
-            class="record__flag-message"
-            :class="{ error: isError }"
+            :class="[cashes.flagMessage, { error: isError }]"
           >
             {{ saveMessage }}
+            <span v-if="hasEmptyFields && isError">
+              (Проверьте все кассы с изменениями)
+            </span>
           </div>
         </transition>
       </div>
@@ -622,292 +352,135 @@
 
 <style module="cashes" lang="scss">
   .cashes {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 200px);
+    padding: rem(12) rem(8);
     background: var(--a-white);
-  }
-</style>
+    overflow: auto;
 
-<style lang="scss">
-  .casher-section {
+    &::-webkit-scrollbar {
+      width: rem(8);
+      height: rem(8);
+    }
+
+    &::-webkit-scrollbar-track {
+      background: var(--a-bgLight);
+      border-radius: rem(4);
+      margin: rem(4) 0;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--a-borderAccent);
+      border-radius: rem(4);
+      transition: background 0.3s ease;
+
+      &:hover {
+        background: var(--a-mainBg);
+      }
+    }
+
+    /* Стили для Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: var(--a-borderAccent) var(--a-bgLight);
+
+    /* Стили для IE/Edge */
+    -ms-overflow-style: -ms-autohiding-scrollbar;
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .section {
+    position: relative;
     display: flex;
     flex-direction: column;
     margin-bottom: rem(40);
   }
 
-  .casher-block {
+  .row {
     position: relative;
     display: flex;
-    flex-direction: column;
-    max-width: rem(1000);
-    min-height: rem(80);
-    padding: rem(12) rem(24);
-    background-color: var(--a-bgTable);
-    border-radius: rem(12);
-    margin-bottom: rem(20);
-    transition: all 0.3s ease;
-    -webkit-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    -moz-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    gap: 1.125rem;
+    align-items: center;
+    margin-bottom: rem(24);
+  }
+  .actions {
+    display: flex;
+    gap: 18px;
+  }
 
-    &:last-child {
-      margin-bottom: 0;
-    }
+  .btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: max-content;
+    flex-shrink: 0;
+    padding: rem(4) rem(12);
+    font-size: 0.875rem;
+    font-weight: 600;
+    background-color: var(--a-accentTextDark);
+    border-radius: 0.25rem;
+    transition: background-color 0.3s;
+    cursor: pointer;
 
-    &__title {
-      max-width: 80%;
-      margin-bottom: rem(20);
-      font-size: rem(13);
-      font-weight: 600;
-      line-height: 1.2;
-    }
-
-    &__row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-    }
-
-    &__column {
-      display: flex;
-      flex-direction: column;
-      align-content: space-between;
-      flex: 1;
-      gap: rem(10);
-    }
-
-    &__call-right {
-      display: flex;
-      align-items: center;
-      margin-left: auto;
-      gap: rem(10);
-    }
-
-    &__col-title {
-      max-width: rem(140);
-      margin-right: rem(8);
-      font-size: rem(12);
-      font-weight: 600;
-      white-space: wrap;
-      line-height: 1.2;
-    }
-
-    &__delete-btn {
-      position: absolute;
-      top: rem(24);
-      right: rem(22);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
-      & svg {
-        color: var(--a-bgAccent);
-
-        &:hover {
-          color: var(--a-bgAccentDark);
-        }
-      }
-    }
-
-    &__icon {
-      position: absolute;
-      width: rem(22);
-      height: rem(22);
-      cursor: pointer;
-      transition: transform 0.2s ease;
+    &:disabled {
+      padding: rem(2) rem(12);
+      background-color: var(--a-bgLight);
+      border: 1px solid var(--a-borderAccent);
+      opacity: 0.5;
+      cursor: not-allowed;
 
       &:hover {
-        transform: scale(1.1);
+        color: var(--a-mainText);
+        background-color: var(--a-bgLight);
+        border: 1px solid var(--a-borderAccent);
       }
     }
-
-    &__title-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-right: auto;
-      margin-bottom: rem(20);
-    }
-
-    &__title-input {
-      flex: 1;
-      margin-right: auto;
-      padding: rem(4) rem(12);
-      border: 1px solid var(--a-borderAccentLight);
-      border-radius: rem(4);
-      font-size: rem(12);
-      font-weight: 600;
-      background-color: var(--a-bgTable);
-      transition: border-color 0.2s ease;
-
-      &:focus {
-        outline: none;
-        border-color: var(--a-primary);
-      }
-
-      &--edting {
-        background-color: var(--a-white);
-      }
-    }
-
-    &__title-text {
-      flex: 1;
-      max-width: rem(800);
-      margin: 0;
-      padding: rem(8) rem(14);
-      font-size: rem(13);
-      font-weight: 600;
-      line-height: 1.2;
-      background-color: var(--a-white);
-    }
-
-    &__edit-btn {
-      position: relative;
-      top: -2px;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      width: rem(28);
-      height: rem(28);
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: rem(4);
-      color: var(--a-primary);
-      transition: color 0.2s ease;
-
-      &:hover {
-        color: var(--a-primaryDark);
-      }
-    }
-
-    &__edit-icon {
-      width: rem(16);
-      height: rem(16);
-    }
-
-    &__item-calendar {
-      display: flex;
-      margin-right: rem(20);
-      font-size: rem(12);
-    }
-
-    & .dp__input_wrap .dp__input {
-      width: rem(170);
-      padding-left: rem(34);
-    }
-
-    & .dp__action_button {
-      background-color: var(--a-bgAccentLight);
-
-      &:hover {
-        background-color: var(--a-bgAccentDark);
-      }
-    }
-
-    & .dp__pointer {
-      padding: 0 rem(10);
-      font-size: rem(13);
-      font-weight: 600;
-      background-color: var(--a-mainBg);
-
-      &:hover {
-        color: var(--a-accentTextExDark);
-      }
-    }
-
-    & .dp__input_wrap svg {
-      padding: 0 rem(8);
-    }
-
-    &__error-hint {
-      color: var(--a-errorText);
-      font-size: rem(9);
-      margin-top: rem(4);
-      display: block;
-    }
-
-    &__input {
-      max-width: rem(160);
-    }
-
-    &__ok-btn {
-      padding: rem(4) rem(12);
-      margin-left: rem(8);
-      background-color: var(--a-bgAccent);
-      color: white;
-      border: none;
-      border-radius: rem(4);
-      cursor: pointer;
-      font-size: rem(12);
-      transition: background-color 0.2s ease;
-
-      &:hover {
-        background-color: var(--a-bgAccentDark);
-      }
+    &:hover {
+      color: var(--a-white);
+      background-color: var(--a-bgAccentDark);
+      transition: background-color 0.3s;
     }
   }
 
-  .fade-enter-active,
-  .fade-leave-active {
-    transition: opacity 0.3s ease;
-  }
+  .btnAction {
+    color: var(--a-mainText);
 
-  .fade-enter-from,
-  .fade-leave-to {
-    opacity: 0;
-  }
-
-  .error-field {
-    border-color: #ff4444 !important;
-    box-shadow: 0 0 0 1px #ff4444;
-    animation: shake 0.5s ease-in-out;
-
-    &::placeholder {
-      color: #ff9999;
+    &:hover {
+      color: var(--a-white);
+      background-color: var(--a-bgAccentDark);
+      transition: background-color 0.3s;
     }
   }
 
-  .error-data-field {
-    .dp__input_wrap {
-      border-color: #ff4444 !important;
-      border-radius: rem(4);
-      box-shadow: 0 0 0 1px #ff4444;
-      animation: shake 0.5s ease-in-out;
-
-      .dp__input {
-        &::placeholder {
-          color: #ff9999;
-        }
-      }
-    }
+  .btnGhost {
+    padding: rem(2) rem(12);
+    background-color: var(--a-bgLight);
+    border: 1px solid var(--a-borderAccent);
   }
 
-  @keyframes shake {
-    0%,
-    100% {
-      transform: translateX(0);
-    }
-    20%,
-    60% {
-      transform: translateX(-3px);
-    }
-    40%,
-    80% {
-      transform: translateX(3px);
-    }
+  .btnTitle {
+    padding: 0;
   }
 
-  .casher-block__error-message {
-    color: #ff4444;
-    font-size: 0.75rem;
-    margin-top: 0.25rem;
-    display: block;
-  }
+  .flagMessage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: rem(4) rem(16);
+    height: rem(26);
+    font-size: rem(13);
+    font-weight: 600;
+    color: var(--a-lightText);
+    background-color: var(--a-bgGreen);
+    border-radius: rem(4);
+    z-index: 2;
 
-  .record__flag-message.error {
-    background-color: #ffebee;
-    color: #ff4444;
-    border: 1px solid #ff4444;
+    &.error {
+      background-color: var(--a-bgError);
+    }
   }
 </style>

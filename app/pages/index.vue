@@ -1,13 +1,17 @@
 <script setup lang="ts">
-  import { useUserStore } from "~/stores/user";
-  import { useKkt } from "~/composables/useKkt";
-
-  const userStore = useUserStore();
-  const { kktData, kktLoading, kktError, loadKktData } = useKkt();
+  import { useUserStore } from "~/stores/userData";
 
   definePageMeta({
     middleware: "auth",
   });
+
+  const userStore = useUserStore();
+
+  // Данные уже есть в сторе после авторизации
+  console.log("User INDEX:", userStore.user);
+
+  const { user, fetchUser, isLoading, error } = useUser();
+  const { callApi, data: kktData } = useApi<UserData>();
 
   const saveMessage = ref("");
   const isError = ref(false);
@@ -18,8 +22,13 @@
     { label: "Номер помещения", value: userStore.user?.room_number },
     { label: "Номер договора", value: userStore.user?.contract_number },
     { label: "Тип договора", value: userStore.user?.contract_type },
-    { label: "Дата заключения договора", value: userStore.user?.contract_date },
+    {
+      label: "Дата заключения договора",
+      value: userStore.user?.contract_date,
+    },
   ]);
+
+  console.log("userFields", userFields);
 
   const showMessage = (message: string, error = false) => {
     saveMessage.value = message;
@@ -31,7 +40,8 @@
 
   onMounted(async () => {
     try {
-      await loadKktData();
+      await fetchUser();
+      await callApi("/tenants/kkts");
     } catch (err) {
       console.log(err);
       showMessage("Ошибка при загрузке данных ККТ", true);
@@ -51,7 +61,7 @@
       {{ saveMessage }}
     </div>
 
-    <ul class="home-view__list">
+    <ul v-if="!isLoading && user" class="home-view__list">
       <li
         v-for="(field, index) in userFields"
         :key="index"
@@ -61,14 +71,14 @@
         <span class="home-view__item-text">{{ field.value ?? "-" }}</span>
       </li>
 
-      <li v-if="kktLoading" class="home-view__item">
+      <li v-if="isLoading" class="home-view__item">
         <span class="home-view__item-text">Загрузка данных ККТ...</span>
       </li>
 
-      <li v-else-if="kktError" class="home-view__item">
+      <li v-else-if="error" class="home-view__item">
         <span class="home-view__item-text text-error">
           Ошибка загрузки данных ККТ
-          <button class="retry-button" @click="loadKktData">Повторить</button>
+          <button class="retry-button" @click="callApi">Повторить</button>
         </span>
       </li>
 

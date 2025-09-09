@@ -1,19 +1,11 @@
 <script setup lang="ts">
   import * as z from "zod";
   import type { FormSubmitEvent } from "@nuxt/ui";
-  import { useAuthStore } from "~/stores/auth";
+  import { useUserData } from "~/composables/useUser";
 
   const authStore = useAuthStore();
-  const user = useUser();
-
-  // type LoginResponse = {
-  //   success: boolean;
-  //   message: string;
-  //   payload: {
-  //     access_token: string;
-  //     refresh_token: string;
-  //   };
-  // };
+  const userStore = useUserStore();
+  const { fetchUser } = useUserData();
 
   type ApiError = {
     response?: {
@@ -47,12 +39,15 @@
     isLoading.value = true;
 
     try {
-      // Используем authStore вместо прямого вызова $fetch
       const response = await authStore.logIn(event.data);
 
       if (response?.success) {
-        // После успешного логина загружаем данные пользователя
-        await user.fetchUser();
+        // Получаем данные пользователя и они автоматически сохраняются в сторе
+        await fetchUser();
+
+        // Теперь данные доступны из стора
+        console.log("User data from store AUTHFORM:", userStore.user);
+
         await navigateTo("/", { replace: true });
       }
     } catch (error: unknown) {
@@ -188,4 +183,3 @@
     }
   }
 </style>
-

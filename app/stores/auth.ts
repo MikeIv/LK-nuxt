@@ -1,4 +1,3 @@
-// stores/auth.ts
 import { defineStore } from "pinia";
 import { useCookie } from "#app";
 
@@ -19,18 +18,18 @@ export const useAuthStore = defineStore("auth", () => {
   const config = useRuntimeConfig();
 
   const router = useRouter();
+  const authStore = useAuthStore();
 
   // Сохраняем токен и настраиваем таймер обновления
   const setToken = (newToken: string) => {
     token.value = newToken;
     const cookie = useCookie("token", {
-      maxAge: 60 * 15, // 15 минут (как access token)
+      maxAge: 60 * 120, // 120 минут (как access token)
       secure: true,
       sameSite: "strict",
     });
     cookie.value = newToken;
 
-    // Запланировать обновление токена за 1 минуту до истечения срока
     scheduleTokenRefresh(120 * 60 * 1000); // 120 минут
   };
 
@@ -43,7 +42,6 @@ export const useAuthStore = defineStore("auth", () => {
     }
   };
 
-  // Запланировать обновление токена
   const scheduleTokenRefresh = (delay: number) => {
     if (refreshTimeout.value) {
       clearTimeout(refreshTimeout.value);
@@ -66,6 +64,9 @@ export const useAuthStore = defineStore("auth", () => {
         baseURL: config.public.apiBase,
         method: "POST",
         credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
       });
 
       if (response.success) {
@@ -110,14 +111,24 @@ export const useAuthStore = defineStore("auth", () => {
         baseURL: config.public.apiBase,
         method: "POST",
         credentials: "include",
+        headers: authStore.token
+          ? {
+              Authorization: `Bearer ${authStore.token}`,
+            }
+          : {},
+      }).catch((err) => {
+        // Игнорируем ошибки сервера при logout, так как главное - очистить клиентскую сторону
+        console.warn("Server logout failed (may be expected):", err.message);
       });
+    } catch (err) {
+      console.warn("Logout request failed:", err);
     } finally {
+      // Всегда очищаем токен на клиенте
       clearToken();
       await router.push("/login");
     }
   };
 
-  // Инициализация при загрузке хранилища
   const init = () => {
     const savedToken = useCookie("token").value;
     if (savedToken) {
@@ -140,4 +151,3 @@ export const useAuthStore = defineStore("auth", () => {
     refreshToken,
   };
 });
-

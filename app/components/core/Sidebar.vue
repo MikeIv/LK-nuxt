@@ -1,9 +1,17 @@
 <script setup lang="ts">
   import { useLocalStorage } from "@vueuse/core";
-  import { useUserStore } from "~/stores/user";
-  import { useApi } from "~/composables/useApi";
+  import { useUserStore } from "~/stores/userData";
+  const { isActive } = useActiveRoute();
 
   const userStore = useUserStore();
+
+  // Данные уже есть в сторе после авторизации
+  console.log("UserSIDBAR:", userStore.user);
+  console.log("Is authenticated:", userStore.isAuthenticated);
+
+  // const userStore = useUser();
+  // console.log("userStore", userStore.user);
+
   const { isLoading } = useApi();
   const sidebarCollapsed = useLocalStorage("sidebarCollapsed", false);
 
@@ -14,6 +22,7 @@
     { to: "/", icon: "i-home", text: "На главную" },
     { to: "/record", icon: "i-report", text: "Сформировать отчет" },
     { to: "/archive", icon: "i-archive", text: "Архив отчетов" },
+    { to: "/applications", icon: "i-archive", text: "Мои заявки" },
     { to: "/cashiers", icon: "i-cashier", text: "Мои кассы" },
   ];
 
@@ -24,13 +33,13 @@
     bgClass: userStore.user?.debt > 0 ? "hasDebt" : "noDebt",
   }));
 
-  onMounted(async () => {
-    try {
-      await userStore.getUser();
-    } catch (err) {
-      console.error("Failed to load user data:", err);
-    }
-  });
+  // onMounted(async () => {
+  //   try {
+  //     await userStore.getUser();
+  //   } catch (err) {
+  //     console.error("Failed to load user data:", err);
+  //   }
+  // });
 </script>
 
 <template>
@@ -73,8 +82,8 @@
             $style.item,
             $style.link,
             { '!max-w-[160px]': sidebarCollapsed },
+            { [$style.activeLink]: isActive(link.to) },
           ]"
-          :active-class="$style.activeLink"
         >
           <UIcon :name="link.icon" :class="$style.iconLink" />
           <span v-if="!sidebarCollapsed" :class="$style.title">
@@ -159,6 +168,10 @@
 
   .activeLink {
     background-color: var(--a-bgAccentExLight);
+    transition: background-color 0.3s ease;
+    &:hover {
+      background-color: var(--color-primary-200);
+    }
   }
 
   .title {

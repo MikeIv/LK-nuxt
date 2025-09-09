@@ -67,8 +67,6 @@
     flex-direction: column;
     width: 100%;
     height: 100%;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
 
     &::-webkit-scrollbar {
       width: rem(6);
@@ -84,4 +82,3 @@
     }
   }
 </style>
-

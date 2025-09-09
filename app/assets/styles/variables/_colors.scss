@@ -2,34 +2,35 @@
   // Base
   --a-white: #fff;
   --a-black: #000;
-
   --a-mainAccent: #41b883;
 
   // Typography
   --a-mainText: #1c1c1b;
   --a-mainTextLight: #626877;
+  --a-mainTexPlaceholder: #484a50;
   --a-headerText: #878c99;
   --a-accentText: #d5c29a;
   --a-accentTextDark: #d6c399;
   --a-accentTextExDark: #a28556;
-  --a-lightText: #dcf3ea;
-  --a-errorText: #ff0000;
-
+  --a-lightText: #f1ebe5;
+  --a-errorText: #f00;
   --code-accent: #e8a55b;
   --code-ident: #a8c334;
   --code-var: #6c9eea;
   --code-cnt: #d697fb;
 
   // Background
-  --a-mainBg: #e5e5e5;
+  --a-mainBg: #efefef;
   --a-bgAccent: #d5c29a;
   --a-bgAccentLight: #d6c399;
-  --a-bgAccentExLight: #ddceae;
+  --a-bgAccentExLight: #daceb5;
   --a-bgAccentDark: #b19364;
   --a-bgLight: #f7f4ee;
   --a-bgDark: #292d3e;
   --a-bgSepia: #ddceae;
   --a-bgGray: #c1c7cb;
+  --a-bgGrayDark: #93979a;
+  --a-bgGrayLight: #d6dce0;
   --a-bgGreen: #00a54c;
   --a-bgTable: #f7f3eb;
   --a-bgTableLight: #e8e1cf;
@@ -41,5 +42,23 @@
   --a-borderMain: #b4bacc;
   --a-borderAccent: #b19364;
   --a-borderAccentLight: #ddceae;
+  --a-borderAccentDark: #5e4430;
   --a-borderWarning: #e37508;
+  --a-borderError: #ee0101;
+
+  --color-primary-50: #faf7f2;
+  --color-primary-100: #f3eee1;
+  --color-primary-200: #e6dbc2;
+  --color-primary-300: #d5c29a;
+  --color-primary-400: #c4a573;
+  --color-primary-500: #b88f57;
+  --color-primary-600: #aa7c4c;
+  --color-primary-700: #8e6440;
+  --color-primary-800: #735239;
+  --color-primary-900: #5e4430;
+  --color-primary-950: #322218;
+
+  --normal-bg: #d5c29a;
+  --normal-text: #292d3e;
+  --normal-description: #e37508;
 }

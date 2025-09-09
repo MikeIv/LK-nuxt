@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev --port 5173",
+    "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
@@ -15,10 +15,11 @@
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
-    "@nuxt/image": "^1.10.0",
     "@nuxt/icon": "1.15.0",
+    "@nuxt/image": "^1.10.0",
     "@nuxt/ui": "^3.3.0",
     "@pinia/nuxt": "^0.11.2",
+    "@tanstack/vue-table": "^8.21.3",
     "@vuepic/vue-datepicker": "^11.0.2",
     "@vueuse/core": "^13.6.0",
     "@vueuse/nuxt": "^13.6.0",
@@ -50,6 +51,8 @@
     "sass": "^1.89.2",
     "sass-embedded": "^1.89.2",
     "sass-loader": "^16.0.5",
+    "stylelint": "^16.23.0",
+    "stylelint-config-standard-scss": "^15.0.1",
     "typescript": "^5.8.3",
     "universal-cookie": "^7",
     "vite-svg-loader": "^5.1.0"
@@ -71,7 +74,6 @@
       "prettier --write --ignore-unknown"
     ],
     "*.{css,scss}": [
-      "stylelint --fix",
       "prettier --write"
     ],
     "*.{json,md}": [

@@ -1,15 +1,17 @@
 @use "../variables/_base-font-size.scss" as size;
+@use "~/assets/styles/tools/functions" as *;
 
 html,
 body {
   font-size: size.$base-font-size;
+
   //  background-color: var(--a-white) !important;
 }
 
 /** {
   margin: 0;
   padding: 0;
-}*/
+} */
 
 *,
 *::before,
@@ -27,7 +29,7 @@ ul {
 }
 
 .bg-default {
-  background-color: transparent !important;
+  background-color: transparent;
 }
 
 .rounded-md {
@@ -36,6 +38,91 @@ ul {
 }
 
 .ring {
-  border: none !important;
-  box-shadow: none !important;
+  border: none;
+  box-shadow: none;
+}
+
+.steps-nav-btn {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: rem(2) rem(12);
+  width: max-content;
+  flex-shrink: 0;
+  font-size: rem(14);
+  font-weight: 600;
+  color: var(--a-mainText);
+  border-radius: 0.25rem;
+  transition: background-color 0.3s;
+  cursor: pointer;
+
+  &[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &.solid {
+    background-color: var(--a-accentTextDark);
+
+    &.disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+
+      &:hover {
+        color: var(--a-mainText);
+        background-color: var(--a-accentTextDark);
+      }
+    }
+
+    &:hover {
+      color: var(--a-white);
+      background-color: var(--a-bgAccentDark);
+    }
+  }
+
+  &.ghost {
+    background-color: var(--a-bgLight);
+    border: 1px solid var(--a-borderAccent);
+
+    &:hover {
+      color: var(--a-mainText);
+      background-color: var(--a-accentTextDark);
+    }
+  }
+}
+
+.body-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: rem(12);
+  font-weight: 700;
+  border-right: 1px solid var(--a-borderAccentLight);
+  padding: rem(8);
+  background-color: var(--a-bgTable);
+  border-bottom: 1px solid var(--a-borderAccentLight);
+
+  & input {
+    width: 100%;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--a-borderAccentLight);
+    background-color: var(--a-mainBg);
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+  }
+}
+
+.header-cell,
+.cell {
+  display: flex;
+  padding: rem(8);
+}
+
+// Toast
+.toast {
+  color: var(--a-mainText);
+}
+.bg-toast {
+  background-color: var(--a-bgAccentExLight);
 }
